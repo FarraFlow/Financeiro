@@ -133,6 +133,7 @@ select{
   background:var(--papel); color:var(--tinta); border:1px solid var(--linha);
   border-radius:6px; cursor:pointer;
 }
+select option{background:#15242B; color:var(--tinta)}
 select:focus-visible,button:focus-visible{outline:2px solid var(--azul); outline-offset:2px}
 main{padding:22px 26px 60px; max-width:1720px; width:100%; position:relative; z-index:1}
 
@@ -284,7 +285,7 @@ td:first-child{text-align:left; font-family:'Inter',sans-serif; white-space:nowr
 .dre tbody td:first-child{z-index:2}
 .dre thead th:first-child{z-index:5}
 .dre tr.tot td:first-child{background:#1E3A54} .dre tr.fim td:first-child{background:var(--azul-fundo)}
-.dre tr.pct td:first-child{background:rgba(110,231,212,.11)}
+.dre tr.pct td:first-child{background:#1F393E}
 .dre tr.tot td{background:#1E3A54; color:var(--azul-c); font-weight:700; border-top:1px solid #2F5378; border-bottom:1px solid #2F5378}
 .dre tr.fim td{background:var(--azul-fundo); color:#FBFEFD; font-weight:700; border:0}
 .dre tr.pct td{background:rgba(110,231,212,.11); color:var(--margem); font-weight:600; font-size:11.3px}
@@ -1050,7 +1051,10 @@ function filtros() {
 }
 
 let salvoRol = null;
+let forcarTopo = false;
 function render() {
+  const scrollY = forcarTopo ? 0 : window.scrollY;
+  forcarTopo = false;
   const antRol = document.getElementById('rolTab');
   if (antRol) salvoRol = { left: antRol.scrollLeft, top: antRol.scrollTop };
   document.getElementById('nav').innerHTML = `<div class="grp">Relatórios</div>` +
@@ -1069,7 +1073,7 @@ function render() {
     : pgVazia('Indicadores', 'Página reservada para os indicadores gerenciais: ciclo de caixa, giro de estoque, litragem por canal, inadimplência e metas.');
 
   document.querySelectorAll('#nav button').forEach(b => b.onclick = () => {
-    pagina = b.dataset.p; document.getElementById('menu').classList.remove('abre'); render(); });
+    pagina = b.dataset.p; forcarTopo = true; document.getElementById('menu').classList.remove('abre'); render(); });
   const fa = document.getElementById('fAno'), fm = document.getElementById('fMes'), fv = document.getElementById('fVis');
   if (fa) fa.onchange = e => { const ms = mesesDoAno(e.target.value);
     compAtual = ms[ms.length - 1].comp; selPeriodos = new Set(); render(); };
@@ -1091,7 +1095,13 @@ function render() {
   if (cd) cd.onchange = e => { mostrarDelta = e.target.checked; render(); };
   if (fv) fv.onchange = e => { visao = e.target.value; selPeriodos = new Set(); render(); };
   document.querySelectorAll('#tb tr[data-b]').forEach(tr => tr.onclick = () => {
-    abertos[tr.dataset.b] = !abertos[tr.dataset.b]; render(); });
+    const k = tr.dataset.b;
+    const abrir = !abertos[k];
+    abertos[k] = abrir;
+    // recolher fecha em cascata: some com todos os niveis abaixo dessa categoria
+    if (!abrir) Object.keys(abertos).forEach(key => { if (key.startsWith(k + '/')) delete abertos[key]; });
+    render();
+  });
 
   const bt = document.getElementById('btNiveis');
   if (bt) bt.onclick = () => {
@@ -1111,6 +1121,9 @@ function render() {
   };
   sincronizarRolagem();
   desenharEvolucao();
+  // mantem a rolagem da pagina onde estava, mesmo que o conteudo abaixo mude de altura
+  window.scrollTo(0, scrollY);
+  requestAnimationFrame(() => window.scrollTo(0, scrollY));
 }
 
 /* barra de rolagem espelhada no topo da tabela */
