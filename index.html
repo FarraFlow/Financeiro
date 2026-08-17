@@ -250,6 +250,9 @@ svg{display:block; width:100%; height:auto; overflow:visible}
 .bh .nm{font-size:12px; display:flex; justify-content:space-between; gap:8px; margin-bottom:3px; color:var(--tinta)}
 .bh .tr{height:7px; background:var(--papel); border-radius:4px; overflow:hidden}
 .bh .br{height:100%; border-radius:4px; transition:width .5s ease}
+.brilho{background-size:220% 100%; animation:brilho 4.5s ease-in-out infinite}
+@keyframes brilho{0%,100%{background-position:0% 50%} 50%{background-position:100% 50%}}
+@media (prefers-reduced-motion:reduce){ .brilho{animation:none} }
 .bh .pc{font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:right}
 .bh .pc i{display:block; font-style:normal; font-family:'Inter',sans-serif; font-size:8.5px;
   text-transform:uppercase; letter-spacing:.08em; color:var(--cinza-c); margin-top:1px}
@@ -653,11 +656,12 @@ function ponte(p) {
     delta: resid, bom: resid >= 0, efeito: Math.abs(resid) });
 
   const max = Math.max(...ef.map(e => e.efeito), 1);
-  const lista = (titulo, itens, cor) => !itens.length ? '' : `<div class="lado">
+  const grad = { verde: 'linear-gradient(90deg,#3F9142,#8FE07A)', bordo: 'linear-gradient(90deg,#B23A44,#FF6E79)' };
+  const lista = (titulo, itens, cor, key) => !itens.length ? '' : `<div class="lado">
     <h4>${titulo}</h4>${itens.map(e => `<div class="li">
       <div class="nm">${esc(e.n)}${e.antes === null ? '' :
         `<span class="de-para">${M(e.antes)} → ${M(e.depois)}</span>`}</div>
-      <div class="tr"><div class="br" style="width:${Math.max(e.efeito / max * 100, 1.5)}%;background:${cor}"></div></div>
+      <div class="tr"><div class="br brilho" style="width:${Math.max(e.efeito / max * 100, 1.5)}%;background:${grad[key]}"></div></div>
       <div class="vl" style="color:${cor}">${e.delta >= 0 ? '+' : '−'}${R$(Math.abs(e.delta))}</div>
     </div>`).join('')}</div>`;
   const bons = ef.filter(e => e.bom).sort((x, y) => y.efeito - x.efeito);
@@ -669,7 +673,7 @@ function ponte(p) {
     <div class="ponte-sub">${R$(ini)} em ${esc(b.nome)} → ${R$(fim)} em ${esc(a.nome)}.
       Despesa que sobe atrapalha, que desce ajuda; receita segue o inverso — o valor de
       cada item já vem nesse sentido.</div>
-    <div class="ponte-cols">${lista('Ajudou', bons, CORES.verde)}${lista('Atrapalhou', maus, CORES.bordo)}</div></div>`;
+    <div class="ponte-cols">${lista('Ajudou', bons, CORES.verde, 'verde')}${lista('Atrapalhou', maus, CORES.bordo, 'bordo')}</div></div>`;
 }
 
 /* ===================== evolução ===================== */
@@ -762,11 +766,22 @@ function saidas(p) {
   const tot = bl.reduce((s, x) => s + x.v, 0);
   const max = bl[0].v;
   const rb = a.v(CH.rb) || 0, rop = a.v(CH.rop) || 0;
-  const cor = q => q === CH.ded ? CORES.ouro : q === CH.ccv ? CORES.azul : CORES.laranja;
+  const cor = q => q === CH.ded ? 'linear-gradient(90deg,#B8892E,#FFD37A)'
+              : q === CH.ccv ? 'linear-gradient(90deg,#C23B3B,#FF6F61)'
+              : 'linear-gradient(90deg,#D9701D,#FFA24D)';
   const linhas = bl.map(b => `<div class="li"><div>
       <div class="nm"><span>${esc(b.g)}</span><span style="color:var(--cinza);font-family:'IBM Plex Mono',monospace">${R$(b.v)}</span></div>
-      <div class="tr"><div class="br" style="width:${Math.max(b.v / max * 100, .6)}%;background:${cor(b.pai)};opacity:.88"></div></div>
+      <div class="tr"><div class="br brilho" style="width:${Math.max(b.v / max * 100, .6)}%;background:${cor(b.pai)};opacity:.92"></div></div>
     </div><div class="pc">${P(b.v / tot)}</div></div>`).join('');
+  return `<div class="card"><h2>Para onde vai o dinheiro</h2>
+    <div class="leg">Tudo que sai entre a receita bruta e o resultado operacional: deduções, custos com vendas e despesas operacionais.
+      Não inclui resultado financeiro nem não operacional.</div>
+    <div class="tot-bar"><span>Total das saídas</span><b>${R$(tot)}</b></div>
+    <div class="tot-sub">${R$(rb)} de receita bruta − ${R$(tot)} = ${R$(rop)} de resultado operacional</div>
+    <div class="bh">${linhas}</div>
+    <div class="tags"><span><i class="sem" style="background:#FFD37A"></i>Deduções</span>
+      <span><i class="sem" style="background:#FF6F61"></i>Custo com vendas</span>
+      <span><i class="sem" style="background:#FFA24D"></i>Despesas operacionais</span></div></div>`;
   return `<div class="card"><h2>Para onde vai o dinheiro</h2>
     <div class="leg">Tudo que sai entre a receita bruta e o resultado operacional: deduções, custos com vendas e despesas operacionais.
       Não inclui resultado financeiro nem não operacional.</div>
