@@ -29,6 +29,7 @@
   --ouro-c:#FFE388;       /* 2005 CP */
   --verde:#7FE07E;        /* 3561 CP, clareado — segundo acento vivo */
   --laranja:#FFA24D;      /* 2011 CP */
+  --margem:#6EE7D4;       /* ciano — acento proprio das linhas de margem */
 
   --menu:216px;
   --r:14px;
@@ -89,12 +90,12 @@ h1,h2,h3{font-family:'Archivo',sans-serif; letter-spacing:-.01em; margin:0}
   background:radial-gradient(circle, rgba(127,224,126,.28) 0%, rgba(111,163,218,.20) 45%, transparent 72%);
   pointer-events:none;
 }
-.marca img{height:56px; width:auto; display:block; flex:none; position:relative; z-index:1;
+.marca img{height:52px; width:auto; display:block; flex:none; position:relative; z-index:1;
   filter:drop-shadow(0 2px 10px rgba(0,0,0,.4))}
-.marca .tit{display:flex; align-items:center; gap:6px; line-height:1; align-self:center; position:relative; z-index:1}
-.marca .tit b,.marca .tit i{font-family:'Fraunces',serif; font-style:normal; font-size:20px; text-transform:uppercase; font-optical-sizing:auto}
+.marca .tit{display:flex; flex-direction:column; align-items:flex-start; gap:1px; line-height:1.05; position:relative; z-index:1; min-width:0}
+.marca .tit b,.marca .tit i{font-family:'Fraunces',serif; font-style:normal; font-size:17px; text-transform:uppercase; font-optical-sizing:auto; white-space:nowrap}
 .marca .tit b{font-weight:800; letter-spacing:.02em; color:#fff}
-.marca .tit i{font-weight:600; letter-spacing:.13em; color:var(--verde)}
+.marca .tit i{font-weight:600; letter-spacing:.1em; color:var(--verde)}
 .nav{padding:12px 10px; display:flex; flex-direction:column; gap:2px; flex:1}
 .nav .grp{font-size:9.5px; text-transform:uppercase; letter-spacing:.16em; color:#8FADB2; padding:12px 10px 6px}
 .nav button{
@@ -112,10 +113,11 @@ h1,h2,h3{font-family:'Archivo',sans-serif; letter-spacing:-.01em; margin:0}
 /* ================= área principal ================= */
 .wrap{margin-left:216px; min-height:100vh; display:flex; flex-direction:column}
 .topo{
-  background:var(--vidro); backdrop-filter:blur(22px) saturate(150%); -webkit-backdrop-filter:blur(22px) saturate(150%);
+  background:rgba(9,17,23,.94); backdrop-filter:blur(22px) saturate(150%); -webkit-backdrop-filter:blur(22px) saturate(150%);
   border-bottom:1px solid var(--linha);
   padding:13px 26px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
   position:sticky; top:0; z-index:30;
+  box-shadow:0 12px 24px -8px rgba(0,0,0,.35);
 }
 .topo::after{
   content:''; position:absolute; left:0; right:0; top:100%; height:3px;
@@ -195,7 +197,7 @@ main{padding:22px 26px 60px; max-width:1720px; width:100%; position:relative; z-
 .painel input{accent-color:var(--azul); cursor:pointer}
 .dre th.vazia,.dre td.vazia{width:100%; border-bottom:1px solid var(--linha); padding:0}
 .dre tr.tot td.vazia{background:rgba(111,163,218,.16)} .dre tr.fim td.vazia{background:var(--azul-fundo)}
-.dre tr.pct td.vazia{background:rgba(255,195,105,.12)}
+.dre tr.pct td.vazia{background:rgba(110,231,212,.11)}
 .fl{display:flex; align-items:center; gap:5px; font-size:11px; text-transform:uppercase; white-space:nowrap;
   letter-spacing:.1em; color:var(--cinza); cursor:pointer}
 .fl input{accent-color:var(--azul); cursor:pointer}
@@ -282,10 +284,10 @@ td:first-child{text-align:left; font-family:'Inter',sans-serif; white-space:nowr
 .dre tbody td:first-child{z-index:2}
 .dre thead th:first-child{z-index:5}
 .dre tr.tot td:first-child{background:#1E3A54} .dre tr.fim td:first-child{background:var(--azul-fundo)}
-.dre tr.pct td:first-child{background:#3A2E17}
+.dre tr.pct td:first-child{background:rgba(110,231,212,.11)}
 .dre tr.tot td{background:#1E3A54; color:var(--azul-c); font-weight:700; border-top:1px solid #2F5378; border-bottom:1px solid #2F5378}
 .dre tr.fim td{background:var(--azul-fundo); color:#FBFEFD; font-weight:700; border:0}
-.dre tr.pct td{background:#3A2E17; color:var(--ouro-c); font-weight:600; font-size:11.3px}
+.dre tr.pct td{background:rgba(110,231,212,.11); color:var(--margem); font-weight:600; font-size:11.3px}
 .dre tr.abre{cursor:pointer} .dre tr.abre:hover td{filter:brightness(1.22)}
 .dre .seta{display:inline-block; width:13px; color:var(--cinza-c); font-size:9px}
 .neg{color:var(--bordo)}
@@ -915,7 +917,7 @@ function tabelaDRE(cols) {
   return card('DRE detalhado',
     `AV: receitas sobre a receita bruta e sobre a categoria mãe; CMV, taxas, devolução e eventos sobre a receita com vendas;
      o restante sobre a receita bruta. AH compara com o período imediatamente anterior. Δ ano compara com o mesmo período do ano passado.`,
-    `<table class="dre"><thead><tr><th>Linha</th>${th.join('')}<th class="vazia"></th></tr></thead>
+    `<table class="dre"><thead><tr><th>Categorias</th>${th.join('')}<th class="vazia"></th></tr></thead>
       <tbody id="tb">${linhas}</tbody></table>`);
 }
 
