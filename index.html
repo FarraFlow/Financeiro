@@ -40,7 +40,7 @@ body{
   background:var(--bg-1); color:var(--tinta);
   font-family:'Inter',system-ui,sans-serif; font-size:14px; line-height:1.5;
   -webkit-font-smoothing:antialiased;
-  position:relative; isolation:isolate; min-height:100vh;
+  position:relative; min-height:100vh;
 }
 /* ================= aurora animada de fundo ================= */
 body::before,body::after{
@@ -75,9 +75,9 @@ h1,h2,h3{font-family:'Archivo',sans-serif; letter-spacing:-.01em; margin:0}
 
 /* ================= menu lateral ================= */
 .menu{
-  position:fixed; left:0; top:0; bottom:0; width:216px; z-index:40;
+  position:fixed; left:0; top:0; bottom:0; width:216px; z-index:40; transform:translateZ(0);
   background:linear-gradient(165deg, rgba(34,68,98,.82) 0%, rgba(20,58,46,.88) 100%);
-  backdrop-filter:blur(28px) saturate(140%); -webkit-backdrop-filter:blur(28px) saturate(140%);
+  backdrop-filter:blur(14px) saturate(140%); -webkit-backdrop-filter:blur(14px) saturate(140%);
   color:#fff; display:flex; flex-direction:column;
   border-right:1px solid var(--vidro-b);
 }
@@ -113,7 +113,7 @@ h1,h2,h3{font-family:'Archivo',sans-serif; letter-spacing:-.01em; margin:0}
 /* ================= área principal ================= */
 .wrap{margin-left:216px; min-height:100vh; display:flex; flex-direction:column}
 .topo{
-  background:rgba(9,17,23,.94); backdrop-filter:blur(22px) saturate(150%); -webkit-backdrop-filter:blur(22px) saturate(150%);
+  background:rgba(9,17,23,.94); backdrop-filter:blur(12px) saturate(150%); -webkit-backdrop-filter:blur(12px) saturate(150%); transform:translateZ(0);
   border-bottom:1px solid var(--linha);
   padding:13px 26px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
   position:sticky; top:0; z-index:30;
@@ -141,7 +141,7 @@ main{padding:22px 26px 60px; max-width:1720px; width:100%; position:relative; z-
 .kpis{display:grid; gap:10px; margin-bottom:18px; grid-template-columns:repeat(4,1fr)}
 .kpis.k6{grid-template-columns:repeat(6,1fr)}
 .kpi .val{font-size:clamp(15px,1.28vw,21px)}
-.kpi{background:var(--vidro); backdrop-filter:blur(20px) saturate(150%); -webkit-backdrop-filter:blur(20px) saturate(150%);
+.kpi{background:var(--vidro); backdrop-filter:blur(10px) saturate(150%); -webkit-backdrop-filter:blur(10px) saturate(150%); transform:translateZ(0);
   border:1px solid var(--vidro-b); border-radius:var(--r); padding:13px 14px; position:relative; overflow:hidden;
   box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 14px 30px -18px rgba(0,0,0,.55)}
 .kpi::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--cinza-c)}
@@ -157,7 +157,7 @@ main{padding:22px 26px 60px; max-width:1720px; width:100%; position:relative; z-
 /* ================= cartões ================= */
 .grade{display:grid; gap:16px; margin-bottom:16px}
 .c2{grid-template-columns:1.3fr 1fr}
-.card{background:var(--vidro); backdrop-filter:blur(20px) saturate(150%); -webkit-backdrop-filter:blur(20px) saturate(150%);
+.card{background:var(--vidro); backdrop-filter:blur(10px) saturate(150%); -webkit-backdrop-filter:blur(10px) saturate(150%); transform:translateZ(0);
   border:1px solid var(--vidro-b); border-radius:var(--r); padding:19px 21px;
   box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 20px 40px -22px rgba(0,0,0,.6); transition:box-shadow .18s ease, border-color .18s ease}
 .card:hover{box-shadow:0 1px 0 rgba(255,255,255,.08) inset, 0 24px 48px -20px rgba(0,0,0,.68); border-color:rgba(255,255,255,.16)}
@@ -187,7 +187,7 @@ main{padding:22px 26px 60px; max-width:1720px; width:100%; position:relative; z-
 .bt-sel:hover{background:rgba(255,255,255,.14)}
 .bt-sel .cv{color:var(--cinza-c); font-size:10px}
 .painel{position:absolute; right:0; top:calc(100% + 5px); background:#122029; border:1px solid var(--linha);
-  backdrop-filter:blur(24px); border-radius:8px; box-shadow:0 16px 38px rgba(0,0,0,.55); padding:7px; display:none; z-index:60; min-width:172px;
+  backdrop-filter:blur(12px); border-radius:8px; box-shadow:0 16px 38px rgba(0,0,0,.55); padding:7px; display:none; z-index:60; min-width:172px;
   max-width:min(260px, 90vw); max-height:320px; overflow-y:auto}
 .painel.aberto{display:block}
 .painel .opt{display:flex; align-items:center; gap:8px; padding:6px 9px; border-radius:5px;
@@ -249,8 +249,8 @@ svg{display:block; width:100%; height:auto; overflow:visible}
 .bh .li{display:grid; grid-template-columns:1fr 92px; gap:10px; align-items:center}
 .bh .nm{font-size:12px; display:flex; justify-content:space-between; gap:8px; margin-bottom:3px; color:var(--tinta)}
 .bh .tr{height:7px; background:var(--papel); border-radius:4px; overflow:hidden}
-.bh .br{height:100%; border-radius:4px; transition:width .5s ease}
-.brilho{background-size:220% 100%; animation:brilho 4.5s ease-in-out infinite}
+.bh .br{height:100%; border-radius:4px; transition:width .5s ease; transform:translateZ(0)}
+.brilho{background-size:220% 100%; animation:brilho 4.5s ease-in-out infinite; transform:translateZ(0); will-change:background-position}
 @keyframes brilho{0%,100%{background-position:0% 50%} 50%{background-position:100% 50%}}
 @media (prefers-reduced-motion:reduce){ .brilho{animation:none} }
 .bh .pc{font-family:'IBM Plex Mono',monospace; font-size:12px; text-align:right}
@@ -311,7 +311,7 @@ td:first-child{text-align:left; font-family:'Inter',sans-serif; white-space:nowr
 .ins-1 section li{break-inside:avoid; margin-bottom:11px}
 @media (max-width:820px){ .ins-1 section ul{columns:1} }
 tr.tt-canal td{border-top:1.5px solid var(--tinta); font-weight:600; background:var(--papel)}
-.ins section{background:var(--vidro); backdrop-filter:blur(20px) saturate(150%); -webkit-backdrop-filter:blur(20px) saturate(150%);
+.ins section{background:var(--vidro); backdrop-filter:blur(10px) saturate(150%); -webkit-backdrop-filter:blur(10px) saturate(150%);
   border:1px solid var(--vidro-b); border-radius:var(--r); padding:18px 20px}
 .ins h3{font-size:11px; text-transform:uppercase; letter-spacing:.12em; margin-bottom:12px}
 .ins ul{margin:0; padding-left:17px}
@@ -321,7 +321,7 @@ tr.tt-canal td{border-top:1.5px solid var(--tinta); font-weight:600; background:
 .p-v{background:rgba(127,224,126,.18); color:var(--verde)} .p-a{background:rgba(255,195,105,.18); color:var(--ouro)} .p-r{background:rgba(255,110,121,.18); color:var(--bordo)}
 .vazio{color:var(--cinza); font-size:12.5px; font-style:italic}
 
-.vazio-pg{background:var(--vidro); backdrop-filter:blur(20px); border:1px dashed var(--linha); border-radius:var(--r); padding:56px 30px; text-align:center; color:var(--cinza)}
+.vazio-pg{background:var(--vidro); backdrop-filter:blur(10px); border:1px dashed var(--linha); border-radius:var(--r); padding:56px 30px; text-align:center; color:var(--cinza)}
 .vazio-pg h3{font-size:15px; margin-bottom:8px; color:var(--tinta)}
 .vazio-pg p{font-size:13px; margin:0 auto; max-width:470px}
 
@@ -807,10 +807,15 @@ function canais(p) {
     .sort((x, y) => y.receita - x.receita);
   const max = Math.max(...gs.map(x => x.receita), 1);
   const tot = gs.reduce((s, x) => s + Math.max(x.receita, 0), 0) || 1;
-  const linhas = gs.map(x => { const c = x.mb === null ? CORES.cinza : x.mb >= .55 ? CORES.verde : x.mb >= .35 ? CORES.ouro : CORES.bordo;
+  const linhas = gs.map(x => {
+    const c = x.mb === null ? CORES.cinza : x.mb >= .55 ? CORES.verde : x.mb >= .35 ? CORES.ouro : CORES.bordo;
+    const grad = x.mb === null ? 'linear-gradient(90deg,#4B5A5D,#6D8488)'
+      : x.mb >= .55 ? 'linear-gradient(90deg,#3F9142,#8FE07A)'
+      : x.mb >= .35 ? 'linear-gradient(90deg,#B8892E,#FFD37A)'
+      : 'linear-gradient(90deg,#B23A44,#FF6E79)';
     return `<div class="li"><div>
       <div class="nm"><span>${esc(x.g)}</span><span style="color:var(--cinza);font-family:'IBM Plex Mono',monospace">${R$(x.receita)}</span></div>
-      <div class="tr"><div class="br" style="width:${Math.max(x.receita / max * 100, .6)}%;background:${c}"></div></div>
+      <div class="tr"><div class="br brilho" style="width:${Math.max(x.receita / max * 100, .6)}%;background:${grad}"></div></div>
     </div><div class="pc" style="color:${c}">${x.mb === null ? '—' : P(x.mb)}<i>margem</i></div></div>`; }).join('');
   const tab = gs.map(x => `<tr><td>${esc(x.g)}</td><td>${N(x.pedidos)}</td><td>${N(x.litros)}</td>
     <td>${M(x.receita)}</td><td>${M(x.cmv)}</td><td>${x.mb === null ? '—' : P(x.mb)}</td><td>${P(x.receita / tot)}</td></tr>
