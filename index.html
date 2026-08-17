@@ -6,7 +6,7 @@
 <title>Farra DRE</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   /* Pantones Farra Bier */
@@ -49,7 +49,7 @@ h1,h2,h3{font-family:'Archivo',sans-serif; letter-spacing:-.01em; margin:0}
 }
 .marca img{height:56px; width:auto; display:block; flex:none}
 .marca .tit{display:flex; align-items:center; gap:6px; line-height:1; align-self:center}
-.marca .tit b,.marca .tit i{font-family:'Archivo',sans-serif; font-style:normal; font-size:19px; text-transform:uppercase}
+.marca .tit b,.marca .tit i{font-family:'Fraunces',serif; font-style:normal; font-size:20px; text-transform:uppercase; font-optical-sizing:auto}
 .marca .tit b{font-weight:800; letter-spacing:.02em}
 .marca .tit i{font-weight:600; letter-spacing:.13em; color:var(--ouro-c)}
 .nav{padding:12px 10px; display:flex; flex-direction:column; gap:2px; flex:1}
@@ -60,7 +60,8 @@ h1,h2,h3{font-family:'Archivo',sans-serif; letter-spacing:-.01em; margin:0}
   padding:10px 12px; border-radius:7px; cursor:pointer; transition:background .15s,color .15s;
 }
 .nav button:hover{background:rgba(255,255,255,.10); color:#fff}
-.nav button.on{background:#fff; color:#2E4159; font-weight:600}
+.nav button.on{background:#fff; color:#2E4159; font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.nav button.on .ic{color:var(--laranja)}
 .nav button .ic{width:15px; text-align:center; font-size:12px; opacity:.9}
 .nav .rod{margin-top:auto; padding:14px 12px; font-size:10.5px; color:#A8B7C9; line-height:1.45}
 .menu-tog{display:none}
@@ -71,8 +72,14 @@ h1,h2,h3{font-family:'Archivo',sans-serif; letter-spacing:-.01em; margin:0}
   background:var(--carta); border-bottom:1px solid var(--linha);
   padding:13px 26px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
   position:sticky; top:0; z-index:30;
+  box-shadow:0 1px 0 0 rgba(0,0,0,.02);
 }
-.topo h2{font-size:16px; font-weight:700}
+.topo::after{
+  content:''; position:absolute; left:0; right:0; top:100%; height:3px;
+  background:linear-gradient(90deg, var(--laranja) 0%, var(--ouro-c) 45%, transparent 85%);
+  opacity:.9;
+}
+.topo h2{font-family:'Fraunces',serif; font-size:20px; font-weight:600; letter-spacing:-.015em; font-optical-sizing:auto}
 .topo .sub{font-size:11.5px; color:var(--cinza)}
 .filtros{margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap}
 .filtros label{font-size:9.5px; text-transform:uppercase; letter-spacing:.13em; color:var(--cinza)}
@@ -102,7 +109,9 @@ main{padding:22px 26px 60px; max-width:1720px; width:100%}
 /* ================= cartões ================= */
 .grade{display:grid; gap:16px; margin-bottom:16px}
 .c2{grid-template-columns:1.3fr 1fr}
-.card{background:var(--carta); border:1px solid var(--linha); border-radius:var(--r); padding:19px 21px}
+.card{background:var(--carta); border:1px solid var(--linha); border-radius:var(--r); padding:19px 21px;
+  box-shadow:0 1px 2px rgba(35,31,32,.03), 0 6px 16px -10px rgba(35,31,32,.08); transition:box-shadow .18s ease}
+.card:hover{box-shadow:0 2px 4px rgba(35,31,32,.04), 0 10px 24px -12px rgba(35,31,32,.12)}
 .card-cab{display:flex; align-items:flex-start; gap:16px; justify-content:space-between}
 .bt{font:inherit; font-size:11.5px; padding:6px 11px; border:1px solid var(--linha); background:var(--papel);
     color:var(--tinta); border-radius:6px; cursor:pointer; white-space:nowrap}
