@@ -31,6 +31,9 @@
   --laranja:#FFA24D;      /* 2011 CP */
   --margem:#6EE7D4;       /* ciano — acento proprio das linhas de margem */
 
+  --linha-total-bg:#1E3A54;   /* fundo das linhas de totais/subtotais das tabelas */
+  --linha-total-borda:#2F5378; /* borda das linhas de totais/subtotais das tabelas */
+
   --menu:216px;
   --r:14px;
 }
@@ -104,8 +107,8 @@ h1,h2,h3{font-family:'Archivo',sans-serif; letter-spacing:-.01em; margin:0}
   padding:10px 12px; border-radius:9px; cursor:pointer; transition:background .15s,color .15s;
 }
 .nav button:hover{background:rgba(255,255,255,.10); color:#fff}
-.nav button.on{background:linear-gradient(120deg, var(--azul) 0%, var(--verde) 130%); color:#0A141C; font-weight:700; box-shadow:0 4px 16px rgba(111,163,218,.35)}
-.nav button.on .ic{color:#0A141C; opacity:1}
+.nav button.on{background:linear-gradient(120deg, var(--azul) 0%, var(--verde) 130%); color:var(--bg-1); font-weight:700}
+.nav button.on .ic{color:var(--bg-1); opacity:1}
 .nav button .ic{width:16px; height:16px; flex:none; opacity:.75}
 .nav button .ic svg{display:block; width:100%; height:100%}
 .nav .rod{margin-top:auto; padding:14px 12px; font-size:10.5px; color:#7E9A9E; line-height:1.45}
@@ -134,14 +137,13 @@ select{
   background:var(--papel); color:var(--tinta); border:1px solid var(--linha);
   border-radius:6px; cursor:pointer;
 }
-select option{background:#15242B; color:var(--tinta)}
+select option{background:var(--carta); color:var(--tinta)}
 select:focus-visible,button:focus-visible{outline:2px solid var(--azul); outline-offset:2px}
 main{padding:22px 26px 60px; max-width:1720px; width:100%; position:relative; z-index:1}
 
 /* ================= kpis ================= */
 .kpis{display:grid; gap:10px; margin-bottom:18px; grid-template-columns:repeat(4,1fr)}
 .kpis.k6{grid-template-columns:repeat(6,1fr)}
-.kpis.k7{grid-template-columns:repeat(7,1fr)}
 .kpi{background:var(--vidro); backdrop-filter:blur(10px) saturate(150%); -webkit-backdrop-filter:blur(10px) saturate(150%); transform:translateZ(0);
   border:1px solid var(--vidro-b); border-radius:var(--r); padding:13px 14px; position:relative; overflow:hidden;
   box-shadow:0 1px 0 rgba(255,255,255,.06) inset, 0 14px 30px -18px rgba(0,0,0,.55)}
@@ -238,7 +240,7 @@ main{padding:22px 26px 60px; max-width:1720px; width:100%; position:relative; z-
 .casc .nm{font-size:12px; text-align:right; line-height:1.25; color:var(--tinta)}
 .casc .nm.forte{font-weight:600; font-family:'Archivo',sans-serif}
 .casc .tr{position:relative; height:23px; background:linear-gradient(var(--linha),var(--linha)) center/100% 1px no-repeat}
-.casc .br{position:absolute; height:23px; border-radius:3px; transition:width .5s cubic-bezier(.4,0,.2,1), left .5s cubic-bezier(.4,0,.2,1)}
+.casc .br{position:absolute; left:0; top:0; width:100%; height:23px; border-radius:3px; transform-origin:0 0; transition:transform .5s cubic-bezier(.4,0,.2,1)}
 .casc .vl{font-family:'IBM Plex Mono',monospace; font-size:12.5px; text-align:right; font-variant-numeric:tabular-nums; color:var(--tinta)}
 .casc .l.tot{border-top:1px solid var(--linha); border-bottom:1px solid var(--linha); padding:5px 0; margin:3px 0}
 
@@ -270,7 +272,7 @@ svg{display:block; width:100%; height:auto; overflow:visible}
 .bh .li{display:grid; grid-template-columns:1fr 92px; gap:10px; align-items:center}
 .bh .nm{font-size:12px; display:flex; justify-content:space-between; gap:8px; margin-bottom:3px; color:var(--tinta)}
 .bh .tr{height:7px; background:var(--papel); border-radius:4px; overflow:hidden}
-.bh .br{height:100%; border-radius:4px; transition:width .5s ease; transform:translateZ(0)}
+.bh .br{width:100%; height:100%; border-radius:4px; transform-origin:0 0; transition:transform .5s ease}
 .brilho{background-size:220% 100%; animation:brilho 4.5s ease-in-out infinite; transform:translateZ(0); will-change:background-position}
 @keyframes brilho{0%,100%{background-position:0% 50%} 50%{background-position:100% 50%}}
 @media (prefers-reduced-motion:reduce){ .brilho{animation:none} }
@@ -319,17 +321,19 @@ td:first-child{text-align:left; font-family:'Inter',sans-serif; white-space:nowr
 .dre tr.n2 td:first-child{padding-left:48px}
 .dre tr.n2 td{color:var(--cinza); font-size:11.3px}
 .dre tr.n3 td:first-child{padding-left:70px}
-.dre tr.n3 td{color:var(--cinza-c); font-size:10.8px}
+.dre tr.n3 td{color:var(--cinza); font-size:10.8px}
 .dre td.tt{font-weight:600}
 .dre th{position:sticky; top:0; z-index:3}
 .dre td:first-child,.dre th:first-child{position:sticky; left:0; background:var(--carta)}
 .dre tbody td:first-child{z-index:2}
 .dre thead th:first-child{z-index:5}
-.dre tr.tot td:first-child,.dre tr.fim td:first-child{background:#1E3A54}
+.dre tr.tot td:first-child,.dre tr.fim td:first-child{background:var(--linha-total-bg)}
 .dre tr.pct td:first-child{background:#1F393E}
-.dre tr.tot td,.dre tr.fim td{background:#1E3A54; color:var(--azul-c); font-weight:700; border-top:1px solid #2F5378; border-bottom:1px solid #2F5378}
+.dre tr.tot td,.dre tr.fim td{background:var(--linha-total-bg); color:var(--azul-c); font-weight:700; border-top:1px solid var(--linha-total-borda); border-bottom:1px solid var(--linha-total-borda)}
 .dre tr.pct td{background:rgba(110,231,212,.11); color:var(--margem); font-weight:600; font-size:11.3px}
 .dre tr.abre{cursor:pointer} .dre tr.abre:hover td{filter:brightness(1.22)}
+.dre tr.abre:focus-visible{outline:2px solid var(--azul); outline-offset:-2px}
+.dre tr.abre:focus-visible td{filter:brightness(1.22)}
 .dre .seta{display:inline-block; width:13px; color:var(--cinza-c); font-size:9px}
 .neg{color:var(--bordo)}
 .dre tr.tot td.neg,.dre tr.fim td.neg,.dre tr.pct td.neg{color:var(--bordo)}
@@ -365,10 +369,10 @@ tr.tt-canal td{border-top:1.5px solid var(--tinta); font-weight:600; background:
 
 @media (max-width:1024px){ .c2{grid-template-columns:1fr} .ponte-cols{grid-template-columns:1fr} }
 @media (max-width:900px){
-  .kpis, .kpis.k6, .kpis.k7{grid-template-columns:repeat(3,1fr)}
+  .kpis, .kpis.k6{grid-template-columns:repeat(3,1fr)}
 }
 @media (max-width:640px){
-  .kpis, .kpis.k6, .kpis.k7{grid-template-columns:repeat(2,1fr)}
+  .kpis, .kpis.k6{grid-template-columns:repeat(2,1fr)}
   .kpi{padding:11px 12px}
   .kpi .val{font-size:16px}
   .topo{padding:11px 14px}
@@ -378,13 +382,15 @@ tr.tt-canal td{border-top:1.5px solid var(--tinta); font-weight:600; background:
   .card h2{font-size:11px}
   .card .leg{font-size:10.5px; line-height:1.45; margin:4px 0 12px}
   .card-cab{gap:10px}
-  .bt{font-size:10.5px; padding:5px 9px}
+  .bt{font-size:11px; padding:11px 14px}
+  .bt-sel{padding:11px 14px}
+  .painel .opt{padding:10px 9px}
   .fl{font-size:10px}
 }
 @media (max-width:820px){
   .menu{transform:translateX(-100%); transition:transform .2s}
   .menu.abre{transform:none}
-  .menu-tog{display:inline-block; background:none; border:1px solid var(--linha); border-radius:6px; padding:5px 9px; cursor:pointer; font-size:15px}
+  .menu-tog{display:inline-block; background:none; border:1px solid var(--linha); border-radius:6px; padding:10px 13px; cursor:pointer; font-size:15px}
   .wrap{margin-left:0}
   main{padding:16px 14px 48px}
   .casc .l{grid-template-columns:92px 1fr 88px 48px 54px; gap:6px}
@@ -468,7 +474,11 @@ const P = v => (v === null || v === undefined || !isFinite(v)) ? '—'
   : (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
 const N = v => (v || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const CORES = { laranja: '#FFA24D', bordo: '#FF6E79', verde: '#7FE07E', ouro: '#FFC369', azul: '#6FA3DA', cinza: '#6D8488' };
+/* le direto do :root do CSS -- evita ter a mesma cor da marca duplicada
+   como string fixa aqui e no template.html (fonte unica de verdade) */
+const _tok = nome => getComputedStyle(document.documentElement).getPropertyValue(nome).trim();
+const CORES = { laranja: _tok('--laranja'), bordo: _tok('--bordo'), verde: _tok('--verde'),
+  ouro: _tok('--ouro'), azul: _tok('--azul'), cinza: _tok('--cinza-c') };
 const ic = id => `<svg viewBox="0 0 24 24"><use href="#${id}"/></svg>`;
 
 const H = DADOS.historico.anos;
@@ -505,6 +515,14 @@ const CH = { rb: 'RECEITA BRUTA', rcv: 'RECEITA COM VENDAS', rl: 'RECEITA LÍQUI
   ccv: 'CUSTO COM VENDAS', rbr: 'RESULTADO BRUTO', dop: 'DESPESAS OPERACIONAIS',
   rop: 'RESULTADO OPERACIONAL', rex: 'RESULTADO DO EXERCÍCIO', rfin: 'RESULTADO FINANCEIRO',
   ded: 'DEDUÇÕES DA RECEITA BRUTA' };
+
+/* abre/recolhe uma linha de categoria nas tabelas (DRE ou Caixa); recolher
+   fecha em cascata, some com todos os niveis abaixo dessa categoria */
+function alternarLinha(store, k) {
+  const abrir = !store[k];
+  store[k] = abrir;
+  if (!abrir) Object.keys(store).forEach(key => { if (key.startsWith(k + '/')) delete store[key]; });
+}
 
 let pagina = 'dre', visao = 'mes', abertos = {};
 let mostrarAV = true, mostrarAH = true, mostrarDelta = false;
@@ -684,7 +702,7 @@ function cascata(p) {
       if (x) { dh = (Math.abs(s.v) - Math.abs(x)) / Math.abs(x); bom = s.t === 'neg' ? -1 : 1; } }
     return `<div class="l ${s.t === 'fim' ? 'tot' : ''}">
       <div class="nm ${forte ? 'forte' : ''}">${s.n}</div>
-      <div class="tr"><div class="br" style="left:${l}%;width:${w}%;background:${cor};opacity:${s.t === 'sub' ? .82 : 1}"></div></div>
+      <div class="tr"><div class="br" style="transform:translateX(${l}%) scaleX(${w / 100});background:${cor};opacity:${s.t === 'sub' ? .82 : 1}"></div></div>
       <div class="vl" style="${s.t === 'fim' ? 'font-weight:600;color:' + (s.v >= 0 ? CORES.verde : CORES.bordo) : ''}">${M(s.t === 'neg' ? Math.abs(s.v) : s.v)}</div>
       <div class="vl av">${av === null ? '—' : P(Math.abs(av))}</div>
       <div class="vl ${dh === null ? 'av' : (dh * bom >= 0 ? 'up' : 'down')}">${dh === null ? '—' : (dh >= 0 ? '+' : '') + (dh * 100).toFixed(1) + '%'}</div>
@@ -745,7 +763,7 @@ function ponte(p) {
     <h4>${titulo}</h4>${itens.map(e => `<div class="li">
       <div class="nm">${esc(e.n)}${e.antes === null ? '' :
         `<span class="de-para">${M(e.antes)} → ${M(e.depois)}</span>`}</div>
-      <div class="tr"><div class="br brilho" style="width:${Math.max(e.efeito / max * 100, 1.5)}%;background:${grad[key]}"></div></div>
+      <div class="tr"><div class="br brilho" style="transform:scaleX(${Math.max(e.efeito / max, .015)}) translateZ(0);background:${grad[key]}"></div></div>
       <div class="vl" style="color:${cor}">${e.delta >= 0 ? '+' : '−'}${R$(Math.abs(e.delta))}</div>
     </div>`).join('')}</div>`;
   const bons = ef.filter(e => e.bom).sort((x, y) => y.efeito - x.efeito);
@@ -867,7 +885,7 @@ function saidas(p) {
               : 'linear-gradient(90deg,#D9701D,#FFA24D)';
   const linhas = bl.map(b => `<div class="li"><div>
       <div class="nm"><span>${esc(b.g)}</span><span style="color:var(--cinza);font-family:'IBM Plex Mono',monospace">${R$(b.v)}</span></div>
-      <div class="tr"><div class="br brilho" style="width:${Math.max(b.v / max * 100, .6)}%;background:${cor(b.pai)};opacity:.92"></div></div>
+      <div class="tr"><div class="br brilho" style="transform:scaleX(${Math.max(b.v / max, .006)}) translateZ(0);background:${cor(b.pai)};opacity:.92"></div></div>
     </div><div class="pc">${P(b.v / tot)}</div></div>`).join('');
   return `<div class="card"><h2><span class="ic-chip">${ic('ic-saidas')}</span>Para onde vai o dinheiro</h2>
     <div class="leg">Tudo que sai entre a receita bruta e o resultado operacional: deduções, custos com vendas e despesas operacionais.
@@ -914,7 +932,7 @@ function canais(p) {
       : 'linear-gradient(90deg,#B23A44,#FF6E79)';
     return `<div class="li" data-g="${gid(x.g)}"><div>
       <div class="nm"><span class="nome"><i class="dot" style="background:${x.cor}"></i>${esc(x.g)}</span><span style="color:var(--cinza);font-family:'IBM Plex Mono',monospace">${R$(x.receita)}</span></div>
-      <div class="tr"><div class="br brilho" style="width:${Math.max(x.receita / max * 100, .6)}%;background:${grad}"></div></div>
+      <div class="tr"><div class="br brilho" style="transform:scaleX(${Math.max(x.receita / max, .006)}) translateZ(0);background:${grad}"></div></div>
     </div><div class="pc" style="color:${c}">${x.mb === null ? '—' : P(x.mb)}<i>margem</i></div><div class="pc">${P(x.receita / tot)}<i>participação</i></div></div>`; }).join('');
   const tab = gs.map(x => `<tr><td>${esc(x.g)}</td><td>${N(x.pedidos)}</td><td>${N(x.litros)}</td>
     <td>${M(x.receita)}</td><td>${M(x.cmv)}</td><td>${x.mb === null ? '—' : P(x.mb)}</td><td>${P(x.receita / tot)}</td></tr>
@@ -1048,8 +1066,8 @@ function tabelaDRE(cols) {
       if (mostrarAH) { const d = delta(aggTot, totRefAno, x); tds.push(`<td class="tt ${classeVar(d, x.l)}">${fmt(d, x.pct)}</td>`); }
       if (mostrarDelta) { const d = delta(aggTot, totRefAno, x); tds.push(`<td class="tt ${classeVar(d, x.l)}">${fmt(d, x.pct)}</td>`); }
     }
-    return `<tr class="${x.cls} ${x.temF ? 'abre' : ''}" ${x.temF ? `data-b="${esc(x.idF)}"` : ''}>
-      <td><span class="seta">${x.temF ? (abertos[x.idF] ? '▾' : '▸') : ''}</span>${esc(x.rot)}</td>${tds.join('')}<td class="vazia"></td></tr>`;
+    return `<tr class="${x.cls} ${x.temF ? 'abre' : ''}" ${x.temF ? `data-b="${esc(x.idF)}" role="button" tabindex="0" aria-expanded="${abertos[x.idF] ? 'true' : 'false'}"` : ''}>
+      <td><span class="seta" aria-hidden="true">${x.temF ? (abertos[x.idF] ? '▾' : '▸') : ''}</span>${esc(x.rot)}</td>${tds.join('')}<td class="vazia"></td></tr>`;
   }).join('');
 
   return card('DRE detalhado',
@@ -1242,7 +1260,6 @@ function kpisCaixa(ano, mesesNums) {
   const resultado = agg.porCaminho['RESULTADO DE CAIXA DO PERÍODO'];
   const prazoRec = agg.diasRecQtd ? agg.diasRecSoma / agg.diasRecQtd : null;
   const prazoPag = agg.diasPagQtd ? agg.diasPagSoma / agg.diasPagQtd : null;
-  const ciclo = (prazoRec !== null && prazoPag !== null) ? prazoPag - prazoRec : null;
   const dias = v => v === null ? '—' : Math.round(Math.abs(v)) + ' dias';
   const resultadoOp = agg.porCaminho['RESULTADO DE CAIXA OPERACIONAL'];
 
@@ -1257,10 +1274,8 @@ function kpisCaixa(ano, mesesNums) {
       dica: 'Média de dias entre a Emissão do título e a Data de Crédito (quando o dinheiro entrou de fato).' },
     { r: 'Prazo<br>Médio&nbsp;de<br>Pagamento', ic: 'ic-caixa', v: dias(prazoPag), s: `${N(agg.diasPagQtd)} título(s)`, c: '',
       dica: 'Média de dias entre a Emissão do título e a Data de Débito (quando o dinheiro saiu de fato).' },
-    { r: 'Ciclo de caixa', ic: 'ic-margem', v: ciclo === null ? '—' : Math.round(Math.abs(ciclo)) + ' dias', s: '', c: ciclo !== null && ciclo < 0 ? 'r' : '',
-      dica: 'Prazo médio de pagamento menos prazo médio de recebimento. Positivo: a empresa paga depois de receber (financiada por fornecedores/bancos). Negativo: paga antes de receber.' },
   ];
-  return `<div class="kpis k7">${cards.map(k => `<div class="kpi ${k.c}"${k.dica ? ` title="${esc(k.dica)}"` : ''}>
+  return `<div class="kpis k6">${cards.map(k => `<div class="kpi ${k.c}"${k.dica ? ` title="${esc(k.dica)}"` : ''}>
     <div class="ic-rot"><div class="ic-chip">${ic(k.ic)}</div><div class="rot">${k.r}</div></div>
     <div class="val"${k.full ? ` title="${esc(k.full)}"` : ''}>${k.v}</div><div class="sub">${k.s}</div></div>`).join('')}</div>`;
 }
@@ -1324,8 +1339,8 @@ function tabelaCaixaHTML(ano) {
       return `<td class="${!vazio && v < 0 ? 'neg' : ''}">${vazio ? '—' : M(v)}</td>`;
     }).join('');
     const celAcum = multi ? `<td class="tt ${x.val < 0 ? 'neg' : ''}">${M(x.val)}</td>` : '';
-    return `<tr class="${x.cls} ${x.temF ? 'abre' : ''}" ${x.temF ? `data-bc="${esc(x.idF)}"` : ''}>
-      <td><span class="seta">${x.temF ? (abertosCaixa[x.idF] ? '▾' : '▸') : ''}</span>${esc(x.rot)}</td>${celulas}${celAcum}</tr>`;
+    return `<tr class="${x.cls} ${x.temF ? 'abre' : ''}" ${x.temF ? `data-bc="${esc(x.idF)}" role="button" tabindex="0" aria-expanded="${abertosCaixa[x.idF] ? 'true' : 'false'}"` : ''}>
+      <td><span class="seta" aria-hidden="true">${x.temF ? (abertosCaixa[x.idF] ? '▾' : '▸') : ''}</span>${esc(x.rot)}</td>${celulas}${celAcum}</tr>`;
   }).join('');
   return `<table class="dre"><thead><tr><th>Categorias</th>${th}<th class="vazia"></th></tr></thead>
     <tbody id="tbCaixa">${linhas}</tbody></table>`;
@@ -1429,7 +1444,7 @@ function donutCaixa(idSvg, grupos) {
   const legenda = grupos.map((x, i) => `<div class="li li-2col" data-pc="${idSvg}-${i}"><div>
       <div class="nm"><span class="nome"><i class="dot" style="background:${x.cor}"></i>${esc(x.rot)}</span>
         <span style="color:var(--cinza);font-family:'IBM Plex Mono',monospace">${R$(x.v)}</span></div>
-      <div class="tr"><div class="br brilho" style="width:${Math.max(x.v / tot * 100, .6)}%;background:${x.cor}"></div></div>
+      <div class="tr"><div class="br brilho" style="transform:scaleX(${Math.max(x.v / tot, .006)}) translateZ(0);background:${x.cor}"></div></div>
     </div><div class="pc">${P(x.v / tot)}</div></div>`).join('');
   return `<div class="canais-grid">
     <svg class="canal-donut" id="${idSvg}" viewBox="0 0 120 120" role="img" aria-label="Participação por categoria">${fatias}</svg>
@@ -1707,21 +1722,16 @@ function render() {
     });
     document.getElementById('painelPerCaixa').onclick = e => e.stopPropagation();
   }
-  document.querySelectorAll('#tb tr[data-b]').forEach(tr => tr.onclick = () => {
-    const k = tr.dataset.b;
-    const abrir = !abertos[k];
-    abertos[k] = abrir;
-    // recolher fecha em cascata: some com todos os niveis abaixo dessa categoria
-    if (!abrir) Object.keys(abertos).forEach(key => { if (key.startsWith(k + '/')) delete abertos[key]; });
-    render();
+  document.querySelectorAll('#tb tr[data-b]').forEach(tr => {
+    const ativar = () => { alternarLinha(abertos, tr.dataset.b); render(); };
+    tr.onclick = ativar;
+    tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ativar(); } };
   });
 
-  document.querySelectorAll('#tbCaixa tr[data-bc]').forEach(tr => tr.onclick = () => {
-    const k = tr.dataset.bc;
-    const abrir = !abertosCaixa[k];
-    abertosCaixa[k] = abrir;
-    if (!abrir) Object.keys(abertosCaixa).forEach(key => { if (key.startsWith(k + '/')) delete abertosCaixa[key]; });
-    render();
+  document.querySelectorAll('#tbCaixa tr[data-bc]').forEach(tr => {
+    const ativar = () => { alternarLinha(abertosCaixa, tr.dataset.bc); render(); };
+    tr.onclick = ativar;
+    tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ativar(); } };
   });
 
   const btc = document.getElementById('btNiveisCaixa');
