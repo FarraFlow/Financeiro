@@ -376,6 +376,22 @@ svg{display:block; width:100%; height:auto; overflow:visible}
 .bh .pc i{display:block; font-style:normal; font-family:'Inter',sans-serif; font-size:8.5px;
   text-transform:uppercase; letter-spacing:.08em; color:var(--cinza-c); margin-top:1px}
 
+/* ================= ponto de equilíbrio ================= */
+.pe-cv .nm .mono{font-family:'IBM Plex Mono',monospace; color:var(--cinza)}
+.pe-cv .li.pe-tot{border-top:1px solid var(--linha); margin-top:4px; padding-top:8px}
+.pe-cv .li.pe-tot .nm{font-weight:600; color:var(--tinta)}
+.pe-cv .li.pe-tot .nm .mono{color:var(--tinta)}
+.pe-nums{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:16px 0 4px}
+.pe-num{background:var(--papel); border-radius:8px; padding:11px 13px; border-left:3px solid var(--cinza-c)}
+.pe-num:nth-child(2){border-left-color:var(--laranja)}
+.pe-num:nth-child(3){border-left-color:var(--verde)}
+.pe-num .rot{font-size:9.5px; text-transform:uppercase; letter-spacing:.13em; color:var(--cinza)}
+.pe-num .val{font-family:'IBM Plex Mono',monospace; font-size:clamp(15px,1.3vw,19px); font-weight:600;
+  letter-spacing:-.03em; color:var(--tinta); margin:5px 0 3px}
+.pe-num .sub{font-size:10.5px; color:var(--cinza-c); line-height:1.35}
+.pe-comp .nm .mono{font-family:'IBM Plex Mono',monospace; color:var(--cinza)}
+@media (max-width:640px){ .pe-nums{grid-template-columns:1fr} }
+
 /* ================= canais: anel + lista =================
    sem legenda separada: a cor da fatia repete no ponto ao lado do nome de cada
    canal na lista, e o hover liga anel <-> linha (ver ligarCanais em app_v2.js). */
@@ -1610,6 +1626,92 @@ function saidas(p) {
       <span><i class="sem" style="background:${CORES.laranja}"></i>Despesas operacionais</span></div></div>`;
 }
 
+/* ===================== ponto de equilíbrio financeiro ===================== */
+/* Custos variáveis: os 6 itens que acompanham a receita, cada um lido do período
+   selecionado sobre a base declarada -- deduções e logística sobre a receita bruta;
+   CMV, taxas, devolução e eventos sobre a receita com vendas (as mesmas bases da AV
+   do DRE). Margem de contribuição % = 1 − (custo variável total ÷ receita bruta).
+   Custos fixos = Despesas Operacionais. Ponto de equilíbrio = custos fixos ÷ margem
+   de contribuição = a receita bruta em que o resultado operacional zera. Margem de
+   segurança = quanto a receita do período está acima (ou abaixo) desse ponto. */
+const CV_PONTO_EQ = [
+  { rot: 'Deduções',            cam: 'DEDUÇÕES DA RECEITA BRUTA',            base: 'rb'  },
+  { rot: 'CMV',                 cam: 'CUSTO COM VENDAS/CMV',                 base: 'rcv' },
+  { rot: 'Taxas e Comissões',   cam: 'CUSTO COM VENDAS/TAXAS E COMISSÕES',   base: 'rcv' },
+  { rot: 'Devolução de vendas', cam: 'CUSTO COM VENDAS/DEVOLUÇÃO DE VENDAS', base: 'rcv' },
+  { rot: 'Eventos',             cam: 'CUSTO COM VENDAS/EVENTOS',             base: 'rcv' },
+  { rot: 'Logística',           cam: 'CUSTO COM VENDAS/LOGÍSTICA',           base: 'rb'  }
+];
+
+function calcPontoEquilibrio(agg) {
+  const rb = agg.v(CH.rb) || 0, rcv = agg.v(CH.rcv) || 0;
+  const bases = { rb, rcv }, rotBase = { rb: 'receita bruta', rcv: 'receita com vendas' };
+  const vars = CV_PONTO_EQ.map(c => {
+    const bruto = agg.vc(c.cam);                 // null quando a categoria não existe no período
+    const valor = Math.abs(bruto || 0);         // custos são guardados como magnitude
+    const base = bases[c.base];
+    return { rot: c.rot, cam: c.cam, valor, base, baseRot: rotBase[c.base],
+      pct: base ? valor / base : null,
+      presente: bruto !== null && bruto !== undefined };
+  });
+  const cvTotal = vars.reduce((s, x) => s + x.valor, 0);
+  const cvIndice = rb ? cvTotal / rb : null;
+  const mc = cvIndice === null ? null : 1 - cvIndice;
+  const custosFixos = Math.abs(agg.v(CH.dop) || 0);
+  const pe = (mc !== null && mc > 0) ? custosFixos / mc : null;
+  const folga = pe === null ? null : rb - pe;
+  const margemSeg = (pe === null || !rb) ? null : folga / rb;
+  return { rb, rcv, vars, cvTotal, cvIndice, mc, custosFixos, pe, folga, margemSeg };
+}
+
+function pontoEquilibrio(p) {
+  const a = agregar(p); if (!a) return '';
+  const r = calcPontoEquilibrio(a);
+  const temPE = r.pe !== null;
+  const escala = v => `scaleX(${Math.max(v || 0, .004)})`;
+
+  const linhaCV = x => `<div class="li"><div>
+      <div class="nm"><span>${esc(x.rot)}</span><span class="mono">${x.presente ? R$(x.valor) : '—'}</span></div>
+      <div class="tr"><div class="br" style="transform:${escala(x.pct)};background:linear-gradient(90deg,#C23B3B,#FF6F61);opacity:.9"></div></div>
+    </div><div class="pc">${x.pct === null ? '—' : P(x.pct)}<i>da ${x.baseRot}</i></div></div>`;
+
+  const linhaTot = (rot, valTxt, frac, pctTxt, cor) => `<div class="li pe-tot"><div>
+      <div class="nm"><span>${esc(rot)}</span><span class="mono">${valTxt}</span></div>
+      <div class="tr"><div class="br" style="transform:${escala(frac)};background:${cor}"></div></div>
+    </div><div class="pc">${pctTxt}<i>da receita bruta</i></div></div>`;
+
+  const maxB = Math.max(r.rb, r.pe || 0) || 1;
+  const barra = (rot, val, cor) => `<div class="li"><div>
+      <div class="nm"><span>${esc(rot)}</span><span class="mono">${R$0(val)}</span></div>
+      <div class="tr"><div class="br" style="transform:scaleX(${Math.max(val / maxB, .004)});background:${cor}"></div></div>
+    </div><div class="pc"></div></div>`;
+
+  const nums = [
+    { rot: 'Custos fixos', v: R$0(r.custosFixos), sub: 'Despesas operacionais do período' },
+    { rot: 'Ponto de equilíbrio', v: temPE ? R$0(r.pe) : '—',
+      sub: temPE ? 'Receita bruta que zera o resultado operacional'
+                 : 'Margem de contribuição não-positiva no período' },
+    { rot: 'Margem de segurança', v: r.margemSeg === null ? '—' : P(r.margemSeg),
+      sub: r.folga === null ? 'Sem ponto de equilíbrio'
+         : r.folga >= 0 ? `${R$0(r.folga)} acima do equilíbrio`
+                        : `${R$0(Math.abs(r.folga))} abaixo do equilíbrio` }
+  ];
+
+  return `<div class="card"><h2><span class="ic-chip">${ic('ic-margem')}</span>Ponto de equilíbrio financeiro</h2>
+    <div class="leg">Cada custo variável vem do período selecionado, medido sobre a base indicada.
+      Margem de contribuição = 1 − custo variável total ÷ receita bruta.
+      Ponto de equilíbrio = despesas operacionais ÷ margem de contribuição — a receita bruta em que o resultado operacional zera.</div>
+    <div class="bh pe-cv">${r.vars.map(linhaCV).join('')}
+      ${linhaTot('Custo variável total', R$(r.cvTotal), r.cvIndice, r.cvIndice === null ? '—' : P(r.cvIndice), 'linear-gradient(90deg,#B23A44,#FF6E79)')}
+      ${linhaTot('Margem de contribuição', r.mc === null ? '—' : R$(r.rb - r.cvTotal), r.mc, r.mc === null ? '—' : P(r.mc), 'linear-gradient(90deg,#3F9142,#8FE07A)')}
+    </div>
+    <div class="pe-nums">${nums.map(n => `<div class="pe-num"><div class="rot">${esc(n.rot)}</div>
+      <div class="val">${n.v}</div><div class="sub">${esc(n.sub)}</div></div>`).join('')}</div>
+    <div class="pe-comp"><div class="tot-sub">Receita bruta do período × ponto de equilíbrio</div>
+      <div class="bh">${barra('Receita bruta', r.rb, 'linear-gradient(90deg,#D9701D,#FFA24D)')}
+        ${temPE ? barra('Ponto de equilíbrio', r.pe, 'linear-gradient(90deg,#4B5A5D,#8CA0A4)') : ''}</div></div></div>`;
+}
+
 /* ===================== canais ===================== */
 function canais(p) {
   const cs = p.comps.map(calcDe).filter(Boolean);
@@ -2834,6 +2936,7 @@ function pgDRE() {
   return kpis(p)
     + `<div class="grade">${evolucao(p)}</div>`
     + `<div class="grade c2">${cascata(p)}${saidas(p)}</div>`
+    + `<div class="grade">${pontoEquilibrio(p)}</div>`
     + `<div class="grade">${tabelaDRE(cols)}</div>`
     + `<div class="grade">${canais(p)}</div>`
     + painelInsights(p);
