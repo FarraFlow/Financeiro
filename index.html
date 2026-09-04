@@ -639,6 +639,8 @@ let pagina = 'dre-real', visao = 'mes', abertos = {};
 let mostrarAV = true, mostrarAH = true, mostrarDelta = false;
 let selPeriodos = new Set();   // vazio = todos os periodos do ano
 let painelAberto = false;
+let anosSelDRE = new Set();   // vazio ate o primeiro render; multi = size > 1
+let painelAnoDRE = false;
 let compAtual = CALC.length ? CALC[CALC.length - 1].atual.competencia : TODOS[TODOS.length - 1].comp;
 
 const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
@@ -1119,6 +1121,15 @@ function limparUltimoAberto(storage = localStorage) {
 /* ===================== agregação do DRE ===================== */
 function agregar(p, fonte = H) {
   if (!p || !p.comps.length) return null;
+  // multi-ano: comps de anos diferentes. agregar() abaixo e preso a fonte[p.ano],
+  // entao quebra por ano e delega pra agregarLista (val posicao a posicao,
+  // margens recalculadas). Cobre kpis/cascata/saidas com p sintetico do multi-ano.
+  const anos = [...new Set(p.comps.map(c => c.slice(2)))];
+  if (anos.length > 1) {
+    return agregarLista(anos.sort().map(a => ({
+      ano: a, comps: p.comps.filter(c => c.slice(2) === a), tipo: p.tipo, nome: p.nome, m: p.m,
+    })), fonte);
+  }
   const A = fonte[p.ano];
   const idx = p.comps.map(c => A.meses.findIndex(m => m.comp === c)).filter(i => i >= 0);
   const soma = A.valores.map(v => { let s = null;
@@ -1142,6 +1153,79 @@ function agregar(p, fonte = H) {
   });
   return { linhas: A.linhas, val, porCaminho, ano: p.ano, comps: p.comps, nome: p.nome, tipo: p.tipo,
     v: ch => { const k = A.linhas.findIndex(l => l.rot === ch); return k < 0 ? null : val[k]; },
+    vc: cam => (cam in porCaminho) ? porCaminho[cam] : null };
+}
+
+/* caminho (chave estavel) de cada linha de uma lista de linhas do DRE/Caixa:
+   nivel 0 = rot; 1 = mae0/rot; 2 = mae0/mae1/rot; 3 = mae0/mae1/mae2/rot. */
+function caminhosDe(linhas) {
+  const cams = []; let b0 = null, n1 = null, n2 = null;
+  linhas.forEach(l => {
+    if (l.nivel === 0) { b0 = l.rot; n1 = null; n2 = null; }
+    if (l.nivel === 1) { n1 = l.rot; n2 = null; }
+    if (l.nivel === 2) n2 = l.rot;
+    cams.push(l.nivel === 0 ? l.rot
+      : l.nivel === 1 ? b0 + '/' + l.rot
+      : l.nivel === 2 ? b0 + '/' + n1 + '/' + l.rot
+      : b0 + '/' + n1 + '/' + n2 + '/' + l.rot);
+  });
+  return cams;
+}
+
+/* uniao ordenada das linhas de varios agregados -- cada ano do historico/caixa
+   tem seu proprio conjunto de linhas de detalhe. Base = a lista mais completa;
+   caminhos ausentes das demais entram logo apos o ultimo caminho ja presente,
+   preservando a ordem do DRE. Devolve { linhas, cams }. */
+function unirLinhasPorCaminho(parts) {
+  const listas = parts.map(p => {
+    const cs = caminhosDe(p.linhas);
+    return p.linhas.map((l, i) => ({ l, cam: cs[i] }));
+  });
+  const baseIdx = listas.reduce((bi, lst, i) => lst.length > listas[bi].length ? i : bi, 0);
+  const base = listas[baseIdx].map(x => ({ ...x }));
+  const pos = new Map(base.map((x, i) => [x.cam, i]));
+  listas.forEach((lst, i) => {
+    if (i === baseIdx) return;
+    let ancora = -1;
+    lst.forEach(({ l, cam }) => {
+      if (pos.has(cam)) { ancora = pos.get(cam); return; }
+      base.splice(ancora + 1, 0, { l, cam });
+      ancora += 1;
+      base.forEach((x, j) => pos.set(x.cam, j));
+    });
+  });
+  return { linhas: base.map(x => x.l), cams: base.map(x => x.cam) };
+}
+
+/* soma agregados de anos diferentes -- a coluna Total do multi-ano. agregar() e
+   preso a fonte[p.ano], entao a soma cross-ano e feita aqui alinhando as linhas
+   por CAMINHO (nao por indice -- cada ano tem seu proprio conjunto de linhas).
+   Linhas de valor somam; linhas de margem (%) sao recalculadas sobre os totais
+   somados. Mesmo formato de retorno de agregar(). */
+function agregarLista(cols, fonte = H) {
+  const parts = cols.map(c => agregar(c, fonte)).filter(Boolean);
+  if (!parts.length) return null;
+  const { linhas, cams } = unirLinhasPorCaminho(parts);
+  const soma = linhas.map((l, i) => {
+    if (l.tipo === 'pct') return null;
+    let s = null;
+    parts.forEach(p => { const v = p.vc(cams[i]); if (v !== null && v !== undefined) s = (s || 0) + v; });
+    return s;
+  });
+  const pega = ch => { const k = linhas.findIndex(l => l.rot === ch); return k < 0 ? null : soma[k]; };
+  const rl = pega(CH.rl);
+  const REC = { 'MARGEM BRUTA': CH.rbr, 'MARGEM OPERACIONAL': CH.rop, 'MARGEM LÍQUIDA': CH.rex, 'MARGEM LIQUIDA': CH.rex };
+  const val = linhas.map((l, i) => {
+    if (l.tipo !== 'pct') return soma[i];
+    const b = REC[l.rot.toUpperCase()];
+    if (!b || !rl) return null;
+    const r = pega(b); return r === null ? null : r / rl;
+  });
+  const porCaminho = {};
+  cams.forEach((cam, i) => { if (!(cam in porCaminho)) porCaminho[cam] = val[i]; });
+  return { linhas, val, porCaminho, ano: parts[0].ano, comps: cols.flatMap(c => c.comps),
+    nome: 'Total', tipo: cols[0].tipo,
+    v: ch => { const k = linhas.findIndex(l => l.rot === ch); return k < 0 ? null : val[k]; },
     vc: cam => (cam in porCaminho) ? porCaminho[cam] : null };
 }
 
@@ -1362,16 +1446,52 @@ function ponte(p) {
 }
 
 /* ===================== evolução ===================== */
-function evolucao(p) {
-  const fim = posDe(p.comps[p.comps.length - 1]);
-  const S = TODOS.slice(Math.max(0, fim - 11), fim + 1).map(t => {
-    const a = agregar(periodoDe(t.comp, 'mes'));
-    return { rot: t.rot, rb: a.v(CH.rb) || 0, rex: a.v(CH.rex) || 0, dentro: p.comps.includes(t.comp) };
+/* janela padrao do grafico de Evolucao, por granularidade da Visao */
+const JANELA_EVO = { mes: 12, trim: 8, sem: 6, ano: 99 };
+
+/* rotulo curto do eixo x: jan/25 | 1T/25 | 1S/25 | 2025 (m = ultimo mes do periodo) */
+function rotEixoEvo(tipo, ano, m) {
+  const aa = String(ano).slice(2);
+  if (tipo === 'ano') return String(ano);
+  if (tipo === 'trim') return `${Math.ceil(m / 3)}T/${aa}`;
+  if (tipo === 'sem') return `${Math.ceil(m / 6)}S/${aa}`;
+  return `${MES[m - 1]}/${aa}`;
+}
+
+/* serie do grafico de Evolucao: periodos CONSOLIDADOS conforme a Visao (p.tipo);
+   janela movel terminando no periodo do ultimo comp selecionado, recuando
+   JANELA_EVO[tipo]. Mensal so na Visao Mes; trim/sem/ano viram uma barra por
+   periodo. Cruza anos naturalmente (cobre o multi-ano). */
+function seriePeriodosDRE(p) {
+  const tipo = ['mes', 'trim', 'sem', 'ano'].includes(p.tipo) ? p.tipo : 'mes';
+  const larg = tipo === 'trim' ? 3 : tipo === 'sem' ? 6 : tipo === 'ano' ? 12 : 1;
+  const chave = t => tipo === 'ano' ? t.ano
+    : tipo === 'mes' ? t.comp
+    : t.ano + '-' + Math.ceil(t.m / larg);
+  const ordem = [], ultimo = {};
+  TODOS.forEach(t => { const k = chave(t); if (!(k in ultimo)) ordem.push(k); ultimo[k] = t; });
+  const fimT = TODOS[posDe(p.comps[p.comps.length - 1])];
+  let fimIdx = fimT ? ordem.indexOf(chave(fimT)) : ordem.length - 1;
+  if (fimIdx < 0) fimIdx = ordem.length - 1;
+  const ini = Math.max(0, fimIdx - (JANELA_EVO[tipo] || 12) + 1);
+  return ordem.slice(ini, fimIdx + 1).map(k => {
+    const t = ultimo[k];
+    const per = periodoDe(t.comp, tipo);
+    const a = agregar(per);
+    return { rot: per.nome, rotEixo: rotEixoEvo(tipo, t.ano, t.m),
+      rb: a.v(CH.rb) || 0, rex: a.v(CH.rex) || 0,
+      dentro: per.comps.some(c => p.comps.includes(c)) };
   });
+}
+
+function evolucao(p) {
+  const S = seriePeriodosDRE(p);
   if (S.length < 2) return `<div class="card"><h2><span class="ic-chip">${ic('ic-resultado')}</span>Evolução</h2><div class="leg">Sem base suficiente.</div></div>`;
   window.__EVO = S;
-  return `<div class="card"><h2><span class="ic-chip">${ic('ic-resultado')}</span>Evolução — últimos ${S.length} meses</h2>
-    <div class="leg">Barra: receita bruta. Linha: resultado do exercício. Em destaque, os meses do período selecionado.
+  const un = { mes: 'meses', trim: 'trimestres', sem: 'semestres' }[p.tipo];
+  const tit = un ? `Evolução — últimos ${S.length} ${un}` : 'Evolução — por ano';
+  return `<div class="card"><h2><span class="ic-chip">${ic('ic-resultado')}</span>${tit}</h2>
+    <div class="leg">Barra: receita bruta. Linha: resultado do exercício. Em destaque, os períodos da seleção.
       Passe o mouse para ver os valores.</div>
     <div class="grafico" id="wrapEvo"><div class="dica" id="dicaEvo"></div></div></div>`;
 }
@@ -1402,9 +1522,9 @@ function desenharEvolucao() {
   const pts = S.map((m, i) => [ml + i * bw + bw / 2, y(m.rex)]);
   const linha = pts.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(' ');
   const pontos = pts.map((q, i) => `<circle class="ponto-evo" style="animation-delay:${240 + i * 22}ms" cx="${q[0]}" cy="${q[1]}" r="${estreito ? 3 : 4}" fill="${S[i].rex >= 0 ? CORES.verde : CORES.bordo}" stroke="#0A141C" stroke-width="1.5"/>`).join('');
-  const passoRot = estreito && S.length > 8 ? 2 : 1;   // pula meses no eixo se apertado
+  const passoRot = (estreito && S.length > 8) || S.length > 16 ? 2 : 1;   // pula rotulos no eixo se apertado
   const rots = S.map((m, i) => i % passoRot !== 0 ? '' :
-    `<text class="eixo forte" style="font-size:${fForte}px" x="${ml + i * bw + bw / 2}" y="${Ht - (estreito ? 8 : 11)}" text-anchor="middle">${esc(m.rot)}</text>`).join('');
+    `<text class="eixo forte" style="font-size:${fForte}px" x="${ml + i * bw + bw / 2}" y="${Ht - (estreito ? 8 : 11)}" text-anchor="middle">${esc(m.rotEixo || m.rot)}</text>`).join('');
   const alvos = S.map((m, i) => `<rect class="alvo" x="${ml + i * bw}" y="${mt}" width="${bw}" height="${ih}" fill="transparent" data-i="${i}"/>`).join('');
   const guia = `<line id="guia" x1="0" y1="${mt}" x2="0" y2="${mt + ih}" stroke="${CORES.azul}" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>`;
   window.__EVO_PTS = S.map((m, i) => ({ ...m, x: ml + i * bw + bw / 2 }));
@@ -1607,7 +1727,7 @@ function exportarDRECsv(cols, ocultos) {
   const total = varias ? { ...cols[0], comps: cols.flatMap(c => c.comps),
                            nome: 'Total ' + cols[0].ano, tipo: cols[0].tipo } : null;
   const aggs = cols.map(c => agregar(c));
-  const aggTot = varias ? agregar(total) : aggs[0];
+  const aggTot = varias ? agregar(total) : aggs[0];   // agregar() ja consolida quando total.comps cruza anos
   const n3 = nivel3De(aggTot.comps);
   const L = linhasDRE(aggTot, n3, ocultos);
 
@@ -1650,7 +1770,7 @@ function tabelaDRE(cols, ocultos) {
   const total = varias ? { ...cols[0], comps: cols.flatMap(c => c.comps),
                            nome: 'Total ' + cols[0].ano, tipo: cols[0].tipo } : null;
   const aggs = cols.map(c => agregar(c));
-  const aggTot = varias ? agregar(total) : aggs[0];
+  const aggTot = varias ? agregar(total) : aggs[0];   // agregar() ja consolida quando total.comps cruza anos
   const n3 = nivel3De(aggTot.comps);
   const L = linhasDRE(aggTot, n3, ocultos);
 
@@ -1680,7 +1800,7 @@ function tabelaDRE(cols, ocultos) {
     return r ? agregar(r) : null;
   });
   const refsAno = cols.map(c => { const aa = periodoAnoAnt(c); return aa ? agregar(aa) : null; });
-  const totRefAno = varias ? (() => { const r = periodoAnoAntLista(cols); return r ? agregar(r) : null; })() : null;
+  const totRefAno = (varias && !multiAnoDRE()) ? (() => { const r = periodoAnoAntLista(cols); return r ? agregar(r) : null; })() : null;
 
   /* cabeçalho */
   const th = [];
@@ -1692,7 +1812,7 @@ function tabelaDRE(cols, ocultos) {
   };
   cols.forEach((c, i) => bloco(agregar(c).nome,
     refsAnt[i] ? refsAnt[i].nome : null, refsAno[i] ? refsAno[i].nome : null));
-  if (varias) bloco('Total ' + cols[0].ano, null, totRefAno ? totRefAno.nome : null);
+  if (varias) bloco(multiAnoDRE() ? 'Total' : 'Total ' + cols[0].ano, null, totRefAno ? totRefAno.nome : null);
 
   /* corpo */
   const linhas = L.map(x => {
@@ -1722,6 +1842,7 @@ function tabelaDRE(cols, ocultos) {
 
 /* mesmo conjunto de períodos no ano anterior, para o total */
 function periodoAnoAntLista(cols) {
+  if (new Set(cols.map(c => c.ano)).size > 1) return null;
   const ano = String(+cols[0].ano - 1);
   if (!H[ano]) return null;
   const comps = cols.flatMap(c => c.comps)
@@ -1768,7 +1889,8 @@ function painelInsights(p) {
 /* ===================== Fluxo de Caixa ===================== */
 let abertosCaixa = {};
 let visaoCaixa = 'mes', selPeriodosCaixa = new Set(), painelAbertoCaixa = false;
-let anoCaixaEscolhido = null;   // null = automatico (ano do DRE se existir no caixa, senao o mais recente)
+let anosSelCaixa = new Set();   // anos marcados no painel de Ano do caixa (multi-selecao)
+let painelAnoCaixa = false;
 const CX = DADOS.caixa && DADOS.caixa.anos ? DADOS.caixa.anos : {};
 
 /* ano exibido na pagina do caixa: o do periodo selecionado no DRE, se
@@ -1778,8 +1900,23 @@ const CX = DADOS.caixa && DADOS.caixa.anos ? DADOS.caixa.anos : {};
 function anoCaixaAtual() {
   const anos = Object.keys(CX).sort().reverse();
   if (!anos.length) return null;
-  if (anoCaixaEscolhido && anos.includes(anoCaixaEscolhido)) return anoCaixaEscolhido;
-  return anos.includes(compAtual.slice(2)) ? compAtual.slice(2) : anos[0];
+  const sel = [...anosSelCaixa].sort().at(-1);
+  if (sel && anos.includes(sel)) return sel;
+  return anos.includes(anoBaseDRE()) ? anoBaseDRE() : anos[0];
+}
+
+/* ano de referencia do caixa: o maior ano marcado no painel; sem marca nenhuma
+   cai no ano automatico (anoCaixaAtual). Espelha anoBaseDRE. */
+function anoBaseCaixa() {
+  return [...anosSelCaixa].sort().at(-1) || anoCaixaAtual();
+}
+function multiAnoCaixa() {
+  return anosSelCaixa.size > 1;
+}
+/* rotulo do botao do painel de Ano do caixa: ate 3 anos lista, acima resume */
+function resumoAnoCaixa() {
+  const a = [...anosSelCaixa].sort();
+  return a.length <= 3 ? a.join(', ') : `${a.length} anos`;
 }
 
 /* soma os valores dos meses selecionados (aditivo); kpis de prazo tambem sao
@@ -1790,20 +1927,48 @@ function agregarCaixa(ano, mesesNums) {
   const idx = mesesNums.map(m => A.meses.findIndex(x => x.m === m)).filter(i => i >= 0);
   const val = A.valores.map(v => { let s = null;
     idx.forEach(i => { if (v[i] !== null && v[i] !== undefined) s = (s || 0) + v[i]; }); return s; });
-  const porCaminho = {}; let b0 = null, n1 = null;
-  A.linhas.forEach((l, i) => {
-    if (l.nivel === 0) { b0 = l.rot; n1 = null; }
-    if (l.nivel === 1) n1 = l.rot;
-    const cam = l.nivel === 0 ? l.rot : l.nivel === 1 ? b0 + '/' + l.rot
-      : l.nivel === 2 ? b0 + '/' + n1 + '/' + l.rot : null;
-    if (cam && !(cam in porCaminho)) porCaminho[cam] = val[i];
-  });
+  const cams = caminhosDe(A.linhas);
+  const porCaminho = {};
+  cams.forEach((cam, i) => { if (!(cam in porCaminho)) porCaminho[cam] = val[i]; });
   const somaKpi = chave => idx.reduce((s, i) => s + (A.kpis[chave][i] || 0), 0);
   const somaTotal = chave => idx.reduce((s, i) => s + (A.totais[chave][i] || 0), 0);
   return { linhas: A.linhas, val, porCaminho, idx,
+    vc: cam => (cam in porCaminho) ? porCaminho[cam] : null,
     diasRecSoma: somaKpi('dias_recebimento_soma'), diasRecQtd: somaKpi('dias_recebimento_qtd'),
     diasPagSoma: somaKpi('dias_pagamento_soma'), diasPagQtd: somaKpi('dias_pagamento_qtd'),
     totEntradas: somaTotal('entradas'), totSaidas: somaTotal('saidas'), totResultado: somaTotal('resultado') };
+}
+
+/* soma os agregados de varios pares {ano, meses} -- a coluna Acumulado do
+   multi-ano. Cada ano do caixa tem seu proprio conjunto de linhas, entao a
+   soma alinha por CAMINHO (nao por indice). Componentes *Soma/*Qtd e tot*
+   somados como numeros. Devolve null se nao houver partes. */
+function agregarCaixaLista(pares) {
+  const parts = pares.map(p => agregarCaixa(p.ano, p.meses)).filter(Boolean);
+  if (!parts.length) return null;
+  const { linhas, cams } = unirLinhasPorCaminho(parts);
+  const val = cams.map(cam => {
+    let s = null;
+    parts.forEach(p => { const v = p.vc(cam); if (v !== null && v !== undefined) s = (s || 0) + v; });
+    return s;
+  });
+  const porCaminho = {};
+  cams.forEach((cam, i) => { if (!(cam in porCaminho)) porCaminho[cam] = val[i]; });
+  const soma = ch => parts.reduce((s, p) => s + (p[ch] || 0), 0);
+  return { linhas, val, porCaminho,
+    vc: cam => (cam in porCaminho) ? porCaminho[cam] : null,
+    diasRecSoma: soma('diasRecSoma'), diasRecQtd: soma('diasRecQtd'),
+    diasPagSoma: soma('diasPagSoma'), diasPagQtd: soma('diasPagQtd'),
+    totEntradas: soma('totEntradas'), totSaidas: soma('totSaidas'), totResultado: soma('totResultado') };
+}
+
+/* agregado do caixa no estado atual da pagina: soma todas as colunas quando
+   multi-ano (KPIs precisam refletir a soma dos anos), senao o agregado unico
+   do ano/meses selecionados. */
+function aggCaixaAtual() {
+  return multiAnoCaixa()
+    ? agregarCaixaLista(colunasCaixa().map(c => ({ ano: c.ano, meses: c.meses })))
+    : agregarCaixa(anoCaixaAtual(), mesesNumsCaixa());
 }
 
 /* ===================== seletor de período (caixa) ===================== */
@@ -1812,6 +1977,17 @@ function agregarCaixa(ano, mesesNums) {
    H/TODOS -- porque o caixa pode ter um conjunto de anos/meses diferente do
    historico do DRE. */
 function opcoesPeriodoCaixa(ano) {
+  if (multiAnoCaixa()) {
+    // multi-ano: posicoes de bloco (Q<n>/S<n>) sem ano, uniao dos meses dos
+    // anos marcados. 'ano'/'mes' nao geram posicoes ('mes' nao e oferecido).
+    if (visaoCaixa !== 'trim' && visaoCaixa !== 'sem') return [];
+    const larg = visaoCaixa === 'sem' ? 6 : 3;
+    const pref = visaoCaixa === 'sem' ? 'S' : 'Q';
+    const rot = visaoCaixa === 'sem' ? 'Sem' : 'Trim';
+    const ns = new Set();
+    anosSelCaixa.forEach(a => (CX[a] ? CX[a].meses : []).forEach(m => ns.add(Math.ceil(m.m / larg))));
+    return [...ns].sort((x, y) => x - y).map(n => [`${pref}${n}`, `${n}º ${rot}`]);
+  }
   const ms = CX[ano] ? CX[ano].meses : [];
   if (visaoCaixa === 'mes') return ms.map(m => [m.comp, m.rot]);
   if (visaoCaixa === 'trim') {
@@ -1838,6 +2014,11 @@ function periodoCaixaMeses(compRepresentativo, ms) {
 /* meses efetivamente selecionados no momento, prontos para passar como
    mesesNums para agregarCaixa/tabelaCaixaHTML/kpisCaixa/etc */
 function mesesNumsCaixa() {
+  if (multiAnoCaixa()) {
+    // no multi-ano os meses vivem em anos diferentes; devolve a uniao dos
+    // numeros de mes das colunas (usada so pelos quadros ainda nao multi-ano)
+    return [...new Set(colunasCaixa().flatMap(c => c.meses))].sort((a, b) => a - b);
+  }
   const ano = anoCaixaAtual();
   if (!ano) return [];
   const ms = CX[ano].meses;
@@ -1855,14 +2036,40 @@ function mesesNumsCaixa() {
    comportamento do DRE. Cada coluna soma os meses daquele período; quando
    mais de uma coluna existir, uma coluna extra "Acumulado" soma tudo. */
 function colunasCaixa() {
+  if (multiAnoCaixa()) {
+    // multi-ano: uma coluna por (posicao de bloco x ano), em ordem cronologica
+    // (ano asc, depois posicao asc). Cada coluna carrega .ano proprio. 'mes'
+    // nao e oferecido no multi-ano; 'ano' vira uma coluna por ano.
+    const larg = visaoCaixa === 'sem' ? 6 : 3;
+    const pref = visaoCaixa === 'sem' ? 'S' : 'Q';
+    const cols = [];
+    [...anosSelCaixa].sort().forEach(ano => {
+      if (!CX[ano]) return;
+      const ms = CX[ano].meses;
+      if (visaoCaixa === 'ano') {
+        cols.push({ comp: ano, rot: 'Ano ' + ano, ano, meses: ms.map(m => m.m) });
+        return;
+      }
+      const posicoes = [...new Set(ms.map(m => Math.ceil(m.m / larg)))].sort((a, b) => a - b);
+      const alvo = posicoes.filter(n => selPeriodosCaixa.size === 0 || selPeriodosCaixa.has(pref + n));
+      const usar = alvo.length ? alvo : posicoes;
+      usar.forEach(n => {
+        const grupo = ms.filter(m => Math.ceil(m.m / larg) === n);
+        const rep = grupo.slice(-1)[0];
+        const rotBloco = visaoCaixa === 'sem' ? `${n}º Sem` : `${n}º Trim`;
+        cols.push({ comp: rep.comp, rot: `${rotBloco}/${String(ano).slice(2)}`, ano, meses: grupo.map(m => m.m) });
+      });
+    });
+    return cols;
+  }
   const ano = anoCaixaAtual();
   if (!ano) return [];
   const ms = CX[ano].meses;
-  if (visaoCaixa === 'ano') return [{ comp: ano, rot: 'Ano ' + ano, meses: ms.map(m => m.m) }];
+  if (visaoCaixa === 'ano') return [{ comp: ano, rot: 'Ano ' + ano, ano, meses: ms.map(m => m.m) }];
   const op = opcoesPeriodoCaixa(ano);
   const alvo = op.filter(([c]) => selPeriodosCaixa.size === 0 || selPeriodosCaixa.has(c));
   const usar = alvo.length ? alvo : op;
-  return usar.map(([c, r]) => ({ comp: c, rot: r, meses: periodoCaixaMeses(c, ms) }));
+  return usar.map(([c, r]) => ({ comp: c, rot: r, ano, meses: periodoCaixaMeses(c, ms) }));
 }
 
 function resumoSelecaoCaixa(op) {
@@ -1878,12 +2085,20 @@ function resumoSelecaoCaixa(op) {
 function filtrosCaixa() {
   const ano = anoCaixaAtual();
   if (!ano) return '';
+  if (!anosSelCaixa.size) anosSelCaixa.add(ano);
   const anosCaixa = Object.keys(CX).sort().reverse();
-  const op = opcoesPeriodoCaixa(ano);
-  return `${anosCaixa.length > 1 ? `<label for="fAnoCaixa">Ano</label>
-    <select id="fAnoCaixa">${anosCaixa.map(a => `<option value="${a}" ${a === ano ? 'selected' : ''}>${a}</option>`).join('')}</select>` : ''}
+  const op = opcoesPeriodoCaixa(anoBaseCaixa());
+  const visoes = multiAnoCaixa() ? VISOES.filter(([v]) => v !== 'mes') : VISOES;
+  return `${anosCaixa.length > 1 ? `<label>Ano</label>
+    <div class="sel-multi">
+      <button type="button" class="bt-sel" id="btAnoCaixa" aria-expanded="${painelAnoCaixa}">
+        ${esc(resumoAnoCaixa())} <span class="cv">▾</span></button>
+      <div class="painel ${painelAnoCaixa ? 'aberto' : ''}" id="painelAnoCaixa">
+        ${anosCaixa.map(a => `<label class="opt"><input type="checkbox" class="aOptCaixa" value="${a}"
+          ${anosSelCaixa.has(a) ? 'checked' : ''}> ${a}</label>`).join('')}
+      </div></div>` : ''}
     <label for="fVisCaixa">Visão</label>
-    <select id="fVisCaixa">${VISOES.map(([v, n]) => `<option value="${v}" ${v === visaoCaixa ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    <select id="fVisCaixa">${visoes.map(([v, n]) => `<option value="${v}" ${v === visaoCaixa ? 'selected' : ''}>${n}</option>`).join('')}</select>
     ${op.length ? `<label>Período</label>
     <div class="sel-multi">
       <button type="button" class="bt-sel" id="btPerCaixa" aria-expanded="${painelAbertoCaixa}">
@@ -1896,8 +2111,8 @@ function filtrosCaixa() {
       </div></div>` : ''}`;
 }
 
-function kpisCaixa(ano, mesesNums) {
-  const agg = agregarCaixa(ano, mesesNums);
+function kpisCaixa(ano, mesesNums, aggOverride) {
+  const agg = aggOverride || agregarCaixa(ano, mesesNums);
   if (!agg) return '';
   const totEnt = agg.totEntradas, totSai = agg.totSaidas;
   const resultado = agg.porCaminho['RESULTADO DE CAIXA DO PERÍODO'];
@@ -1936,6 +2151,7 @@ function cardCaixa(titulo, leg, tabela) {
 
 function linhasCaixa(agg) {
   const L = []; let b0 = null, pai1 = null, pai2 = null;
+  const cams = caminhosDe(agg.linhas);
   agg.linhas.forEach((l, k) => {
     const v = agg.val[k];
     if (v === null || v === undefined) return;
@@ -1954,7 +2170,7 @@ function linhasCaixa(agg) {
 
     const cls = l.tipo === 'total' ? 'tot' : 'n' + l.nivel;
     L.push({ cls, temF, idF, rot: (l.sinal ? '(' + l.sinal + ') ' : '') + l.rot,
-      val: v, nivel: l.nivel, k });
+      val: v, nivel: l.nivel, k, cam: cams[k] });
   });
   return L;
 }
@@ -1968,16 +2184,20 @@ function linhasCaixa(agg) {
 function tabelaCaixaHTML(ano) {
   const cols = colunasCaixa();
   if (!cols.length) return '<p>Sem dados de fluxo de caixa para este período.</p>';
-  const aggsPorColuna = cols.map(c => agregarCaixa(ano, c.meses));
+  const aggsPorColuna = cols.map(c => agregarCaixa(c.ano, c.meses));
   if (aggsPorColuna.some(a => !a)) return '<p>Sem dados de fluxo de caixa para este período.</p>';
   const multi = cols.length > 1;
-  const aggTotal = multi ? agregarCaixa(ano, cols.flatMap(c => c.meses)) : aggsPorColuna[0];
+  const aggTotal = multi
+    ? agregarCaixaLista(cols.map(c => ({ ano: c.ano, meses: c.meses })))
+    : aggsPorColuna[0];
   const L = linhasCaixa(aggTotal);
 
   const th = cols.map(c => `<th>${esc(c.rot)}</th>`).join('') + (multi ? '<th class="tt">Acumulado</th>' : '');
   const linhas = L.map(x => {
     const celulas = aggsPorColuna.map(agg => {
-      const v = agg.val[x.k];
+      // single-ano: agg == aggTotal, indice bate. multi-ano: cada ano tem seu
+      // proprio conjunto de linhas -> alinha pela chave de caminho.
+      const v = agg === aggTotal ? x.val : (agg.vc ? agg.vc(x.cam) : agg.val[x.k]);
       const vazio = v === null || v === undefined;
       return `<td class="${!vazio && v < 0 ? 'neg' : ''}">${vazio ? '—' : M(v)}</td>`;
     }).join('');
@@ -1990,21 +2210,53 @@ function tabelaCaixaHTML(ano) {
 }
 
 /* ===================== evolução do caixa ===================== */
-function evolucaoCaixa(ano, mesesNums) {
-  const A = CX[ano];
-  if (!A || !A.meses.length) return '';
-  const dentroSet = new Set(mesesNums || []);
-  const S = A.meses.map((m, i) => {
-    const ent = A.totais.entradas[i] || 0;
-    const sai = A.totais.saidas[i] || 0;
-    const res = A.totais.resultado[i] || 0;
-    return { rot: m.rot, ent, sai, res, dentro: dentroSet.size ? dentroSet.has(m.m) : true };
+/* rotulo cheio (tooltip) de um periodo consolidado do caixa: jan/25 | 1º trim/25 | 1º sem/25 | Ano 2025 */
+function rotCaixaEvo(tipo, ano, m, rotMes) {
+  const aa = String(ano).slice(2);
+  if (tipo === 'ano') return 'Ano ' + ano;
+  if (tipo === 'trim') return `${Math.ceil(m / 3)}º trim/${aa}`;
+  if (tipo === 'sem') return `${Math.ceil(m / 6)}º sem/${aa}`;
+  return rotMes;
+}
+
+/* serie do grafico de Evolucao do caixa: periodos CONSOLIDADOS conforme visaoCaixa,
+   janela movel (12 meses / 8 trim / 6 sem / todos os anos) terminando no periodo
+   da ultima coluna selecionada. Mensal so na Visao Mes; cruza os anos do caixa. */
+function evolucaoCaixa() {
+  const tipo = ['mes', 'trim', 'sem', 'ano'].includes(visaoCaixa) ? visaoCaixa : 'mes';
+  const larg = tipo === 'trim' ? 3 : tipo === 'sem' ? 6 : tipo === 'ano' ? 12 : 1;
+  const periodos = [];
+  Object.keys(CX).sort().forEach(ano => {
+    const ms = CX[ano].meses;
+    [...new Set(ms.map(m => Math.ceil(m.m / larg)))].sort((a, b) => a - b).forEach(pos => {
+      const idx = ms.map((m, i) => [m, i]).filter(([m]) => Math.ceil(m.m / larg) === pos).map(([, i]) => i);
+      const ultM = ms[idx[idx.length - 1]];
+      periodos.push({ ano, idx, ultMes: ultM.m,
+        rot: rotCaixaEvo(tipo, ano, ultM.m, ultM.rot), rotEixo: rotEixoEvo(tipo, ano, ultM.m) });
+    });
+  });
+  if (periodos.length < 2) return '';
+  const cols = colunasCaixa();
+  const ultCol = cols[cols.length - 1];
+  let fimIdx = ultCol
+    ? periodos.findIndex(pp => pp.ano === ultCol.ano && pp.ultMes === ultCol.meses[ultCol.meses.length - 1])
+    : -1;
+  if (fimIdx < 0) fimIdx = periodos.length - 1;
+  const ini = Math.max(0, fimIdx - (JANELA_EVO[tipo] || 12) + 1);
+  const selKeys = new Set(cols.map(c => c.ano + '#' + c.meses[c.meses.length - 1]));
+  const S = periodos.slice(ini, fimIdx + 1).map(pp => {
+    const T = CX[pp.ano].totais;
+    const som = ch => pp.idx.reduce((s, i) => s + (T[ch][i] || 0), 0);
+    return { rot: pp.rot, rotEixo: pp.rotEixo, ent: som('entradas'), sai: som('saidas'), res: som('resultado'),
+      dentro: selKeys.has(pp.ano + '#' + pp.ultMes) };
   });
   if (S.length < 2) return '';
   window.__EVOC = S;
-  return `<div class="card"><h2><span class="ic-chip">${ic('ic-caixa')}</span>Evolução do caixa — ${esc(ano)}</h2>
+  const un = { mes: 'meses', trim: 'trimestres', sem: 'semestres' }[tipo];
+  const tit = un ? `Evolução do caixa — últimos ${S.length} ${un}` : 'Evolução do caixa — por ano';
+  return `<div class="card"><h2><span class="ic-chip">${ic('ic-caixa')}</span>${tit}</h2>
     <div class="leg">Barra clara: entradas. Barra escura: saídas. Linha: resultado do período. Não inclui
-      dinheiro de empréstimos tomados (ver Dívida Bancária). Em destaque, os meses do período selecionado.
+      dinheiro de empréstimos tomados (ver Dívida Bancária). Em destaque, os períodos da seleção.
       Passe o mouse para ver os valores.</div>
     <div class="grafico" id="wrapEvoCaixa"><div class="dica" id="dicaEvoCaixa"></div></div></div>`;
 }
@@ -2036,7 +2288,9 @@ function desenharEvolucaoCaixa() {
   const pts = S.map((m, i) => [ml + i * bw + bw / 2, y(m.res)]);
   const linha = pts.map((q, i) => (i ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(' ');
   const pontos = pts.map((q, i) => `<circle cx="${q[0]}" cy="${q[1]}" r="${estreito ? 3 : 4}" fill="${S[i].res >= 0 ? CORES.verde : CORES.bordo}" stroke="#0A141C" stroke-width="1.5"/>`).join('');
-  const rots = S.map((m, i) => `<text class="eixo forte" style="font-size:${fForte}px" x="${ml + i * bw + bw / 2}" y="${Ht - (estreito ? 8 : 11)}" text-anchor="middle">${esc(m.rot)}</text>`).join('');
+  const passoRotC = (estreito && S.length > 8) || S.length > 16 ? 2 : 1;
+  const rots = S.map((m, i) => i % passoRotC !== 0 ? '' :
+    `<text class="eixo forte" style="font-size:${fForte}px" x="${ml + i * bw + bw / 2}" y="${Ht - (estreito ? 8 : 11)}" text-anchor="middle">${esc(m.rotEixo || m.rot)}</text>`).join('');
   const alvos = S.map((m, i) => `<rect class="alvo" x="${ml + i * bw}" y="${mt}" width="${bw}" height="${ih}" fill="transparent" data-i="${i}"/>`).join('');
   const guia = `<line id="guiaCaixa" x1="0" y1="${mt}" x2="0" y2="${mt + ih}" stroke="${CORES.azul}" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>`;
   window.__EVOC_PTS = S.map((m, i) => ({ ...m, x: ml + i * bw + bw / 2 }));
@@ -2131,11 +2385,10 @@ function gruposDeBlocos(agg, linhasFonte) {
    pelo mesmo indice de paleta e duas do mesmo lado podem colidir de cor */
 const comCor = arr => arr.map((x, i) => ({ ...x, cor: PALETA_CAIXA[i % PALETA_CAIXA.length] }));
 
-function participacaoCaixa(ano, mesesNums) {
-  const A = CX[ano];
-  const agg = agregarCaixa(ano, mesesNums);
-  if (!A || !agg) return '';
-  const todosGrupos = gruposDeBlocos(agg, A);
+function participacaoCaixa() {
+  const agg = aggCaixaAtual();   // ja soma todos os anos selecionados no multi-ano
+  if (!agg) return '';
+  const todosGrupos = gruposDeBlocos(agg, agg);
   const gruposEnt = comCor(todosGrupos.filter(g =>
     // EMPRÉSTIMOS DE TERCEIROS fica de fora: dinheiro tomado emprestado nao e
     // receita, nao deve competir por fatia com as entradas operacionais
@@ -2175,14 +2428,29 @@ const ROTULOS_BANCO = {
   'CAIXA ECONOMICA FEDERAL': 'Caixa Econômica Federal', 'BANCO BRADESCO': 'Banco Bradesco',
 };
 
-function servicoDividaCaixa(ano, mesesNums) {
-  const A = CX[ano];
-  if (!A || !A.divida_bancaria) return '';
-  const idx = mesesNums.map(m => A.meses.findIndex(x => x.m === m)).filter(i => i >= 0);
-  const somaIdx = arr => idx.reduce((s, i) => s + (arr[i] || 0), 0);
-  const linhas = Object.keys(A.divida_bancaria).map(banco => {
-    const juros = somaIdx(A.divida_bancaria[banco].juros);
-    const principal = somaIdx(A.divida_bancaria[banco].principal);
+/* soma juros/principal por banco entre varios pares {ano, meses} -- multi-ano */
+function dividaBancariaLista(pares) {
+  const bancos = {};
+  pares.forEach(({ ano, meses }) => {
+    const A = CX[ano];
+    if (!A || !A.divida_bancaria) return;
+    const idx = meses.map(m => A.meses.findIndex(x => x.m === m)).filter(i => i >= 0);
+    Object.keys(A.divida_bancaria).forEach(banco => {
+      const d = A.divida_bancaria[banco];
+      const j = idx.reduce((s, i) => s + (d.juros[i] || 0), 0);
+      const pr = idx.reduce((s, i) => s + (d.principal[i] || 0), 0);
+      bancos[banco] = bancos[banco] || { juros: 0, principal: 0 };
+      bancos[banco].juros += j; bancos[banco].principal += pr;
+    });
+  });
+  return bancos;
+}
+
+function servicoDividaCaixa() {
+  const pares = colunasCaixa().map(c => ({ ano: c.ano, meses: c.meses }));
+  const bancos = dividaBancariaLista(pares);
+  const linhas = Object.keys(bancos).map(banco => {
+    const { juros, principal } = bancos[banco];
     return { banco, rotulo: ROTULOS_BANCO[banco] || banco, juros, principal, total: juros + principal };
   }).filter(x => x.total > 0).sort((a, b) => b.total - a.total);
   if (!linhas.length) return '';
@@ -2190,7 +2458,7 @@ function servicoDividaCaixa(ano, mesesNums) {
   const totJuros = linhas.reduce((s, x) => s + x.juros, 0);
   const totPrincipal = linhas.reduce((s, x) => s + x.principal, 0);
   const totGeral = totJuros + totPrincipal;
-  const agg = agregarCaixa(ano, mesesNums);
+  const agg = aggCaixaAtual();
   const resultadoReal = agg ? (agg.porCaminho['RESULTADO DE CAIXA DO PERÍODO'] || 0) : 0;
   const resultadoSemDivida = resultadoReal + totGeral;
   const linhasHtml = linhas.map(x => `<tr><td>${esc(x.rotulo)}</td><td>${M(x.principal)}</td><td>${M(x.juros)}</td><td class="tt">${M(x.total)}</td></tr>`).join('');
@@ -2210,14 +2478,17 @@ function servicoDividaCaixa(ano, mesesNums) {
 function pgCaixa() {
   const ano = anoCaixaAtual();
   if (!ano) return pgVazia('Fluxo de Caixa', 'Ainda não há caixa.json processado — rode o fechamento mensal.');
+  const multi = multiAnoCaixa();
   const mesesNums = mesesNumsCaixa();
-  return kpisCaixa(ano, mesesNums)
-    + `<div class="grade">${evolucaoCaixa(ano, mesesNums)}</div>`
+  // multi-ano: KPIs, tabela, evolucao, divida e participacao somam todos os anos
+  // selecionados (via aggCaixaAtual / colunasCaixa).
+  return kpisCaixa(ano, mesesNums, multi ? aggCaixaAtual() : null)
+    + `<div class="grade">${evolucaoCaixa()}</div>`
     + `<div class="grade">${cardCaixa('Fluxo de caixa detalhado — ' + ano,
         'Base caixa: entradas pela Data de Crédito, saídas pela Data de Débito, ambas pelo Valor Pago. Sem previsto/projeção.',
         tabelaCaixaHTML(ano))}</div>`
-    + `<div class="grade">${servicoDividaCaixa(ano, mesesNums)}</div>`
-    + `<div class="grade">${participacaoCaixa(ano, mesesNums)}</div>`;
+    + `<div class="grade">${servicoDividaCaixa()}</div>`
+    + `<div class="grade">${participacaoCaixa()}</div>`;
 }
 
 /* ===================== páginas ===================== */
@@ -2525,8 +2796,29 @@ function pgDREProjetado() {
   return html;
 }
 
-/* periodos que viram colunas: um selecionado, ou todos do ano */
+/* periodos que viram colunas: um selecionado, ou todos do ano.
+   Multi-ano: uma coluna por (posicao de bloco x ano), ano asc e depois posicao asc. */
 function colunas() {
+  if (multiAnoDRE()) {
+    const anos = [...anosSelDRE].sort();
+    if (visao === 'ano') {
+      return anos.map(a => { const ms = mesesDoAno(a); return periodoDe(ms[ms.length - 1].comp, 'ano'); });
+    }
+    const larg = visao === 'sem' ? 6 : 3;   // 'mes' nao ocorre no multi-ano (Visao sem "Mes")
+    const pref = visao === 'sem' ? 'S' : 'Q';
+    const cols = [];
+    anos.forEach(a => {
+      const ms = mesesDoAno(a);
+      const posicoes = [...new Set(ms.map(m => Math.ceil(m.m / larg)))].sort((x, y) => x - y);
+      const alvo = posicoes.filter(n => selPeriodos.size === 0 || selPeriodos.has(pref + n));
+      const usar = alvo.length ? alvo : posicoes;
+      usar.forEach(n => {
+        const rep = ms.filter(m => Math.ceil(m.m / larg) === n).slice(-1)[0].comp;
+        cols.push(periodoDe(rep, visao));
+      });
+    });
+    return cols;
+  }
   if (visao === 'ano') return [periodoDe(compAtual, 'ano')];
   const op = opcoesPeriodo(compAtual.slice(2));
   const alvo = op.filter(([c]) => selPeriodos.size === 0 || selPeriodos.has(c));
@@ -2550,8 +2842,18 @@ function pgDRE() {
 /* ===================== render ===================== */
 const VISOES = [['mes', 'Mês'], ['trim', 'Trimestre'], ['sem', 'Semestre'], ['ano', 'Ano']];
 
-/* opcoes do seletor de periodo, conforme a visao */
+/* opcoes do seletor de periodo, conforme a visao.
+   Multi-ano: posicoes de bloco (Q<n>/S<n>) sem ano, uniao dos meses dos anos marcados. */
 function opcoesPeriodo(ano) {
+  if (multiAnoDRE()) {
+    if (visao !== 'trim' && visao !== 'sem') return [];   // 'ano'/'mes' nao geram posicoes
+    const larg = visao === 'sem' ? 6 : 3;
+    const pref = visao === 'sem' ? 'S' : 'Q';
+    const rot = visao === 'sem' ? 'Sem' : 'Trim';
+    const ns = new Set();
+    anosSelDRE.forEach(a => mesesDoAno(a).forEach(m => ns.add(Math.ceil(m.m / larg))));
+    return [...ns].sort((x, y) => x - y).map(n => [`${pref}${n}`, `${n}º ${rot}`]);
+  }
   const ms = mesesDoAno(ano);
   if (visao === 'mes') return ms.map(m => [m.comp, m.rot]);
   if (visao === 'trim') {
@@ -2580,14 +2882,34 @@ function resumoSelecao(op) {
   return `${marcados.length} períodos`;
 }
 
+/* ano de referencia do DRE Real: o maior ano marcado (single-ano ate a Task 2) */
+function anoBaseDRE() {
+  return [...anosSelDRE].sort().at(-1) || compAtual.slice(2);
+}
+function multiAnoDRE() {
+  return anosSelDRE.size > 1;
+}
+/* rotulo do botao do painel de Ano: ate 3 anos lista, acima resume a contagem */
+function resumoAnoDRE() {
+  const a = [...anosSelDRE].sort();
+  return a.length <= 3 ? a.join(', ') : `${a.length} anos`;
+}
+
 function filtros() {
+  if (!anosSelDRE.size) anosSelDRE.add(compAtual.slice(2));
   const anos = Object.keys(H).sort().reverse();
-  const anoSel = compAtual.slice(2);
-  const op = opcoesPeriodo(anoSel);
-  return `<label for="fAno">Ano</label>
-    <select id="fAno">${anos.map(a => `<option value="${a}" ${a === anoSel ? 'selected' : ''}>${a}</option>`).join('')}</select>
+  const op = opcoesPeriodo(anoBaseDRE());
+  const visoes = multiAnoDRE() ? VISOES.filter(([v]) => v !== 'mes') : VISOES;
+  return `<label>Ano</label>
+    <div class="sel-multi">
+      <button type="button" class="bt-sel" id="btAnoDRE" aria-expanded="${painelAnoDRE}">
+        ${esc(resumoAnoDRE())} <span class="cv">▾</span></button>
+      <div class="painel ${painelAnoDRE ? 'aberto' : ''}" id="painelAnoDRE">
+        ${anos.map(a => `<label class="opt"><input type="checkbox" class="aOptDRE" value="${a}"
+          ${anosSelDRE.has(a) ? 'checked' : ''}> ${a}</label>`).join('')}
+      </div></div>
     <label for="fVis">Visão</label>
-    <select id="fVis">${VISOES.map(([v, n]) => `<option value="${v}" ${v === visao ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    <select id="fVis">${visoes.map(([v, n]) => `<option value="${v}" ${v === visao ? 'selected' : ''}>${n}</option>`).join('')}</select>
     ${op.length ? `<label>Período</label>
     <div class="sel-multi">
       <button type="button" class="bt-sel" id="btPer" aria-expanded="${painelAberto}">
@@ -2632,17 +2954,30 @@ function render() {
 
   document.querySelectorAll('#nav button').forEach(b => b.onclick = () => {
     pagina = b.dataset.p; forcarTopo = true; document.getElementById('menu').classList.remove('abre'); render(); });
-  const fa = document.getElementById('fAno'), fm = document.getElementById('fMes'), fv = document.getElementById('fVis');
-  if (fa) fa.onchange = e => { const ms = mesesDoAno(e.target.value);
-    compAtual = ms[ms.length - 1].comp; selPeriodos = new Set(); render(); };
+  const fm = document.getElementById('fMes'), fv = document.getElementById('fVis');
+  const ba = document.getElementById('btAnoDRE');
+  if (ba) {
+    ba.onclick = e => { e.stopPropagation(); painelAnoDRE = !painelAnoDRE; render(); };
+    document.getElementById('painelAnoDRE').onclick = e => e.stopPropagation();
+    document.querySelectorAll('.aOptDRE').forEach(cb => cb.onchange = () => {
+      if (cb.checked) anosSelDRE.add(cb.value);
+      else if (anosSelDRE.size > 1) anosSelDRE.delete(cb.value);
+      else { cb.checked = true; return; }
+      if (multiAnoDRE() && visao === 'mes') visao = 'trim';
+      selPeriodos = new Set();
+      const ms = mesesDoAno(anoBaseDRE());
+      compAtual = ms[ms.length - 1].comp;
+      render();
+    });
+  }
   const bp = document.getElementById('btPer');
   if (bp) {
     bp.onclick = e => { e.stopPropagation(); painelAberto = !painelAberto; render(); };
     document.getElementById('pTodos').onchange = () => { selPeriodos = new Set(); render(); };
     document.querySelectorAll('.pOpt').forEach(cb => cb.onchange = () => {
       cb.checked ? selPeriodos.add(cb.value) : selPeriodos.delete(cb.value);
-      const ult = [...selPeriodos].sort().pop();
-      if (ult) compAtual = ult;
+      // no multi-ano cb.value e uma posicao ('Q1'), nao uma competencia -- nao mexer em compAtual
+      if (!multiAnoDRE()) { const ult = [...selPeriodos].sort().pop(); if (ult) compAtual = ult; }
       render();
     });
     document.getElementById('painelPer').onclick = e => e.stopPropagation();
@@ -2812,10 +3147,21 @@ function render() {
       render();
     };
   }
-  const fac = document.getElementById('fAnoCaixa');
-  if (fac) fac.onchange = e => { anoCaixaEscolhido = e.target.value; selPeriodosCaixa = new Set(); render(); };
   const fvc = document.getElementById('fVisCaixa');
   if (fvc) fvc.onchange = e => { visaoCaixa = e.target.value; selPeriodosCaixa = new Set(); render(); };
+  const bac = document.getElementById('btAnoCaixa');
+  if (bac) {
+    bac.onclick = e => { e.stopPropagation(); painelAnoCaixa = !painelAnoCaixa; render(); };
+    document.getElementById('painelAnoCaixa').onclick = e => e.stopPropagation();
+    document.querySelectorAll('.aOptCaixa').forEach(cb => cb.onchange = () => {
+      if (cb.checked) anosSelCaixa.add(cb.value);
+      else if (anosSelCaixa.size > 1) anosSelCaixa.delete(cb.value);
+      else { cb.checked = true; return; }
+      if (multiAnoCaixa() && visaoCaixa === 'mes') visaoCaixa = 'trim';
+      selPeriodosCaixa = new Set();
+      render();
+    });
+  }
   const bpc = document.getElementById('btPerCaixa');
   if (bpc) {
     bpc.onclick = e => { e.stopPropagation(); painelAbertoCaixa = !painelAbertoCaixa; render(); };
@@ -2925,6 +3271,8 @@ if (typeof document !== 'undefined' && document.getElementById('tog')) {
   document.addEventListener('click', () => {
     if (painelAberto) { painelAberto = false; render(); }
     else if (painelAbertoCaixa) { painelAbertoCaixa = false; render(); }
+    else if (painelAnoDRE) { painelAnoDRE = false; render(); }
+    else if (painelAnoCaixa) { painelAnoCaixa = false; render(); }
   });
   let __rt;
   window.addEventListener('resize', () => { clearTimeout(__rt); __rt = setTimeout(() => { sincronizarRolagem(); sincronizarRolagem('rolTopoCaixa', 'rolTabCaixa'); desenharEvolucao(); desenharEvolucaoCaixa(); desenharEvolucaoInd(); }, 150); });
